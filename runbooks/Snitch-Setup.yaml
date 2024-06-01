@@ -15,19 +15,49 @@ description: |-
 parameters:
   RuleName:
     type: String
-    default: snitch-cloudtrail-events
+    default: snitch-all-events
   QueueName:
     type: String
-    default: snitch-cloudtrail-events
+    default: snitch-all-events
 mainSteps:
   - name: CreateQueue
     action: aws:executeAwsApi
-    nextStep: PutRule
+    nextStep: SetQueueAttributes
     isEnd: false
     inputs:
       Service: sqs
       Api: CreateQueue
       QueueName: '{{ QueueName }}'
+  - name: SetQueueAttributes
+    action: aws:executeAwsApi
+    nextStep: PutRule
+    isEnd: false
+    inputs:
+      Service: sqs
+      Api: SetQueueAttributes
+      QueueUrl: https://sqs.us-east-1.amazonaws.com/{{ global:ACCOUNT_ID }}/{{ QueueName }}
+      Attributes:
+        Policy: |-
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Action": [
+                  "sqs:SendMessage"
+                ],
+                "Effect": "Allow",
+                "Resource": "arn:aws:sqs:{{ global:REGION }}:{{ global:ACCOUNT_ID }}:{{ QueueName }}",
+                "Condition": {
+                  "ArnEquals": {
+                    "aws:SourceArn": "arn:aws:events:{{ global:REGION }}:{{ global:ACCOUNT_ID }}:rule/default/{{ RuleName }}"
+                  }
+                },
+                "Principal": {
+                    "Service": ["events.amazonaws.com"]
+                }
+              }
+            ]
+          }
   - name: PutRule
     action: aws:executeAwsApi
     nextStep: PutTargets
@@ -38,7 +68,7 @@ mainSteps:
       Name: '{{ RuleName }}'
       EventPattern: |-
         {
-        "detail-type": ["AWS API Call via CloudTrail"]
+        "source": [{"prefix": ""}]
         }
       State: ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS
   - name: PutTargets
