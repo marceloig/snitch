@@ -68,7 +68,7 @@ mainSteps:
       Name: '{{ RuleName }}'
       EventPattern: |-
         {
-        "source": [{"prefix": ""}]
+        "detail-type": [{"prefix": ""}]
         }
       State: ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS
   - name: PutTargets
