@@ -15,10 +15,10 @@ description: |-
 parameters:
   RuleName:
     type: String
-    default: snitch-all-events
+    default: snitch-cloudtrail-events
   QueueName:
     type: String
-    default: snitch-all-events
+    default: snitch-cloudtrail-events
 mainSteps:
   - name: CreateQueue
     action: aws:executeAwsApi
@@ -49,7 +49,7 @@ mainSteps:
                 "Resource": "arn:aws:sqs:{{ global:REGION }}:{{ global:ACCOUNT_ID }}:{{ QueueName }}",
                 "Condition": {
                   "ArnEquals": {
-                    "aws:SourceArn": "arn:aws:events:{{ global:REGION }}:{{ global:ACCOUNT_ID }}:rule/default/{{ RuleName }}"
+                    "aws:SourceArn": "arn:aws:events:{{ global:REGION }}:{{ global:ACCOUNT_ID }}:rule/{{ RuleName }}"
                   }
                 },
                 "Principal": {
@@ -68,7 +68,7 @@ mainSteps:
       Name: '{{ RuleName }}'
       EventPattern: |-
         {
-        "detail-type": [{"prefix": ""}]
+          "detail-type": ["AWS API Call via CloudTrail"]
         }
       State: ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS
   - name: PutTargets
