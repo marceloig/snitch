@@ -105,7 +105,7 @@ class AwsAccessanalyzerAnalyzer(models.Model):
 
 class AwsAccessanalyzerFinding(models.Model):
     access_analyzer_arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) of the analyzer that generated the finding.')
-    id = models.TextField(blank=True, null=True, db_comment='The ID of the finding.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The ID of the finding.')
     analyzed_at = models.DateTimeField(blank=True, null=True, db_comment='The time at which the resource-based policy that generated the finding was analyzed.')
     created_at = models.DateTimeField(blank=True, null=True, db_comment='The time at which the finding was created.')
     error = models.TextField(blank=True, null=True, db_comment='The error that resulted in an Error finding.')
@@ -147,7 +147,7 @@ class AwsAccount(models.Model):
     akas = models.JSONField(blank=True, null=True, db_comment='Array of globally unique identifier strings (also known as) for the resource.')
     partition = models.TextField(blank=True, null=True, db_comment='The AWS partition in which the resource is located (aws, aws-cn, or aws-us-gov).')
     region = models.TextField(blank=True, null=True, db_comment='The AWS Region in which the resource is located.')
-    account_id = models.TextField(blank=True, null=True, db_comment='The AWS Account ID in which the resource is located.')
+    account_id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The AWS Account ID in which the resource is located.')
     sp_connection_name = models.TextField(blank=True, null=True, db_comment='Steampipe connection name.')
     sp_ctx = models.JSONField(blank=True, null=True, db_comment='Steampipe context in JSON form.')
     field_ctx = models.JSONField(db_column='_ctx', blank=True, null=True, db_comment='Steampipe context in JSON form.')  # Field renamed because it started with '_'.
@@ -325,7 +325,7 @@ class AwsAmplifyApp(models.Model):
 
 class AwsApiGatewayApiKey(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The name of the API Key')
-    id = models.TextField(blank=True, null=True, db_comment='The identifier of the API Key')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The identifier of the API Key')
     enabled = models.BooleanField(blank=True, null=True, db_comment='Specifies whether the API Key can be used by callers')
     created_date = models.DateTimeField(blank=True, null=True, db_comment='The timestamp when the API Key was created')
     last_updated_date = models.DateTimeField(blank=True, null=True, db_comment='The timestamp when the API Key was last updated')
@@ -351,7 +351,7 @@ class AwsApiGatewayApiKey(models.Model):
 
 
 class AwsApiGatewayAuthorizer(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The identifier for the authorizer resource')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The identifier for the authorizer resource')
     name = models.TextField(blank=True, null=True, db_comment='The name of the authorizer')
     rest_api_id = models.TextField(blank=True, null=True, db_comment='The id of the rest api')
     auth_type = models.TextField(blank=True, null=True, db_comment='Optional customer-defined field, used in OpenAPI imports and exports without functional impact')
@@ -505,7 +505,7 @@ class AwsApiGatewayStage(models.Model):
 
 class AwsApiGatewayUsagePlan(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The name of a usage plan')
-    id = models.TextField(blank=True, null=True, db_comment='The identifier of a UsagePlan resource')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The identifier of a UsagePlan resource')
     product_code = models.TextField(blank=True, null=True, db_comment='The AWS Markeplace product identifier to associate with the usage plan as a SaaS product on AWS Marketplace')
     description = models.TextField(blank=True, null=True, db_comment='The description of a usage plan')
     quota = models.JSONField(blank=True, null=True, db_comment='The maximum number of permitted requests per a given unit time interval')
@@ -683,7 +683,7 @@ class AwsApiGatewayv2Stage(models.Model):
 
 
 class AwsAppconfigApplication(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The application ID.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The application ID.')
     name = models.TextField(blank=True, null=True, db_comment='The application name.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) that identifies the application.')
     description = models.TextField(blank=True, null=True, db_comment='The description of the application.')
@@ -783,7 +783,7 @@ class AwsAppsyncGraphqlApi(models.Model):
 
 
 class AwsAthenaQueryExecution(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The unique identifier for each query execution.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The unique identifier for each query execution.')
     workgroup = models.TextField(blank=True, null=True, db_comment='The name of the workgroup in which the query ran.')
     catalog = models.TextField(blank=True, null=True, db_comment='The name of the data catalog used in the query execution.')
     database = models.TextField(blank=True, null=True, db_comment='The name of the data database used in the query execution.')
@@ -863,7 +863,7 @@ class AwsAthenaWorkgroup(models.Model):
 
 class AwsAuditmanagerAssessment(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The name of the assessment.')
-    id = models.TextField(blank=True, null=True, db_comment='An unique identifier for the assessment.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='An unique identifier for the assessment.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) of the assessment.')
     status = models.TextField(blank=True, null=True, db_comment='The current status of the assessment.')
     compliance_type = models.TextField(blank=True, null=True, db_comment='The name of the compliance standard related to the assessment.')
@@ -896,7 +896,7 @@ class AwsAuditmanagerAssessment(models.Model):
 class AwsAuditmanagerControl(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The name of the specified control.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) of the specified control.')
-    id = models.TextField(blank=True, null=True, db_comment='An unique identifier for the specified control.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='An unique identifier for the specified control.')
     type = models.TextField(blank=True, null=True, db_comment='The type of control, such as custom or standard.')
     created_at = models.DateTimeField(blank=True, null=True, db_comment='Specifies when the control was created.')
     created_by = models.TextField(blank=True, null=True, db_comment='The IAM user or role that created the control.')
@@ -925,7 +925,7 @@ class AwsAuditmanagerControl(models.Model):
 
 
 class AwsAuditmanagerEvidence(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The identifier for the evidence.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The identifier for the evidence.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) specifying the evidence.')
     assessment_id = models.TextField(blank=True, null=True, db_comment='An unique identifier for the assessment.')
     control_set_id = models.TextField(blank=True, null=True, db_comment='The identifier for the control set.')
@@ -960,7 +960,7 @@ class AwsAuditmanagerEvidence(models.Model):
 
 class AwsAuditmanagerEvidenceFolder(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The name of the specified evidence folder.')
-    id = models.TextField(blank=True, null=True, db_comment='The identifier for the folder in which evidence is stored.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The identifier for the folder in which evidence is stored.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) specifying the evidence folder.')
     assessment_id = models.TextField(blank=True, null=True, db_comment='The identifier for the specified assessment.')
     control_set_id = models.TextField(blank=True, null=True, db_comment='The identifier for the control set.')
@@ -996,7 +996,7 @@ class AwsAuditmanagerEvidenceFolder(models.Model):
 class AwsAuditmanagerFramework(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The name of the specified framework.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) of the framework.')
-    id = models.TextField(blank=True, null=True, db_comment='The unique identified for the specified framework.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The unique identified for the specified framework.')
     type = models.TextField(blank=True, null=True, db_comment='The framework type, such as standard or custom.')
     created_at = models.DateTimeField(blank=True, null=True, db_comment='Specifies when the framework was created.')
     created_by = models.TextField(blank=True, null=True, db_comment='The IAM user or role that created the framework.')
@@ -1291,7 +1291,7 @@ class AwsBackupVault(models.Model):
 
 
 class AwsCloudformationStack(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='Unique identifier of the stack.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='Unique identifier of the stack.')
     name = models.TextField(blank=True, null=True, db_comment='The name associated with the stack.')
     status = models.TextField(blank=True, null=True, db_comment='Current status of the stack.')
     creation_time = models.DateTimeField(blank=True, null=True, db_comment='The time at which the stack was created.')
@@ -1391,7 +1391,7 @@ class AwsCloudformationStackSet(models.Model):
 
 class AwsCloudfrontCachePolicy(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='A unique name to identify the cache policy.')
-    id = models.TextField(blank=True, null=True, db_comment='The unique identifier for the cache policy.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The unique identifier for the cache policy.')
     comment = models.TextField(blank=True, null=True, db_comment='A comment to describe the cache policy.')
     default_ttl = models.BigIntegerField(blank=True, null=True, db_comment='The default amount of time, in seconds, that you want objects to stay in the CloudFront cache before CloudFront sends another request to the origin to see if the object has been updated.')
     etag = models.TextField(blank=True, null=True, db_comment='The current version of the cache policy.')
@@ -1415,7 +1415,7 @@ class AwsCloudfrontCachePolicy(models.Model):
 
 
 class AwsCloudfrontDistribution(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The identifier for the Distribution.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The identifier for the Distribution.')
     arn = models.TextField(blank=True, null=True, db_comment='The ARN (Amazon Resource Name) for the distribution.')
     status = models.TextField(blank=True, null=True, db_comment='The current status of the Distribution.')
     caller_reference = models.TextField(blank=True, null=True, db_comment="A unique value that ensures that the request can't be replayed.")
@@ -1482,7 +1482,7 @@ class AwsCloudfrontFunction(models.Model):
 
 
 class AwsCloudfrontOriginAccessIdentity(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The ID for the origin access identity.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The ID for the origin access identity.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) specifying the origin access identity.')
     s3_canonical_user_id = models.TextField(blank=True, null=True, db_comment='The Amazon S3 canonical user ID for the origin access identity, which you use when giving the origin access identity read permission to an object in Amazon S3.')
     caller_reference = models.TextField(blank=True, null=True, db_comment="A unique value that ensures that the request can't be replayed.")
@@ -1505,7 +1505,7 @@ class AwsCloudfrontOriginAccessIdentity(models.Model):
 
 class AwsCloudfrontOriginRequestPolicy(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='A unique name to identify the origin request policy.')
-    id = models.TextField(blank=True, null=True, db_comment='The ID for the origin request policy.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The ID for the origin request policy.')
     comment = models.TextField(blank=True, null=True, db_comment='The comment for this origin request policy.')
     etag = models.TextField(blank=True, null=True, db_comment='The current version of the origin request policy.')
     last_modified_time = models.DateTimeField(blank=True, null=True, db_comment='The date and time when the origin request policy was last modified.')
@@ -1529,7 +1529,7 @@ class AwsCloudfrontOriginRequestPolicy(models.Model):
 
 class AwsCloudfrontResponseHeadersPolicy(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The name of the response headers policy.')
-    id = models.TextField(blank=True, null=True, db_comment='The identifier for the response headers policy.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The identifier for the response headers policy.')
     arn = models.TextField(blank=True, null=True, db_comment='The version identifier for the current version of the response headers policy.')
     last_modified_time = models.DateTimeField(blank=True, null=True, db_comment='The date and time when the response headers policy was last modified.')
     type = models.TextField(blank=True, null=True, db_comment='The type of response headers policy, either managed (created by AWS) or custom (created in this AWS account).')
@@ -1940,15 +1940,6 @@ class AwsCloudwatchMetric(models.Model):
         managed = False
         db_table = 'aws_cloudwatch_metric'
         db_table_comment = 'AWS CloudWatch Metric'
-# Unable to inspect table 'aws_cloudwatch_metric_data_point'
-# The error was: rpc error: code = Internal desc = aws: rpc error: code = Internal desc = 'List' call for table 'aws_cloudwatch_metric_data_point' is missing 1 required qual: column:'id' operator: =
-
-# Unable to inspect table 'aws_cloudwatch_metric_statistic_data_point'
-# The error was: rpc error: code = Internal desc = aws: rpc error: code = Internal desc = 'List' call for table 'aws_cloudwatch_metric_statistic_data_point' is missing 2 required quals: 
-    column:'metric_name' operator: =
-    column:'namespace' operator: =
-
-
 
 class AwsCodeartifactDomain(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The name of the domain.')
@@ -2010,7 +2001,7 @@ class AwsCodeartifactRepository(models.Model):
 
 class AwsCodebuildBuild(models.Model):
     arn = models.TextField(blank=True, null=True, db_comment='The ARN of the build.')
-    id = models.TextField(blank=True, null=True, db_comment='The unique identifier of the  build.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The unique identifier of the  build.')
     build_batch_arn = models.TextField(blank=True, null=True, db_comment='The ARN of the batch build that this build is a member of, if applicable.')
     build_complete = models.BooleanField(blank=True, null=True, db_comment='Indicates if the build is complete.')
     build_number = models.BigIntegerField(blank=True, null=True, db_comment='The number of the build.')
@@ -2261,7 +2252,7 @@ class AwsCodepipelinePipeline(models.Model):
 
 class AwsCodestarNotificationRule(models.Model):
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) of the notification rule.')
-    id = models.TextField(blank=True, null=True, db_comment='The unique ID of the notification rule.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The unique ID of the notification rule.')
     name = models.TextField(blank=True, null=True, db_comment='The name of the notification rule.')
     resource = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) of the resource associated with the notification rule.')
     detail_type = models.TextField(blank=True, null=True, db_comment='The level of detail included in the notifications for this resource. BASIC will include only the contents of the event as it would appear in Amazon CloudWatch. FULL will include any supplemental information provided by AWS CodeStar Notifications and/or the service for the resource for which the notification is created.')
@@ -2340,7 +2331,7 @@ class AwsCognitoIdentityProvider(models.Model):
 
 
 class AwsCognitoUserPool(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The ID of the user pool.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The ID of the user pool.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) for the user pool.')
     account_recovery_setting = models.JSONField(blank=True, null=True, db_comment='The available verified method a user can use to recover their password when they call ForgotPassword.')
     admin_create_user_config = models.JSONField(blank=True, null=True, db_comment='The configuration for AdminCreateUser requests.')
@@ -2757,20 +2748,6 @@ class AwsCostByServiceUsageTypeMonthly(models.Model):
         managed = False
         db_table = 'aws_cost_by_service_usage_type_monthly'
         db_table_comment = 'AWS Cost Explorer - Cost by Service and Usage Type (Monthly)'
-# Unable to inspect table 'aws_cost_by_tag'
-# The error was: rpc error: code = Internal desc = aws: rpc error: code = Internal desc = 'List' call for table 'aws_cost_by_tag' is missing 2 required quals: 
-    column:'granularity' operator: =
-    column:'tag_key_1' operator: =
-
-# Unable to inspect table 'aws_cost_forecast_daily'
-# The error was: rpc error: code = Unknown desc = aws: operation error Cost Explorer: GetCostForecast, https response error StatusCode: 400, RequestID: 7491199f-781c-456b-85f6-f481ac4269ab, DataUnavailableException: Insufficient amount of historical data.
-# Unable to inspect table 'aws_cost_forecast_monthly'
-# The error was: rpc error: code = Unknown desc = aws: operation error Cost Explorer: GetCostForecast, https response error StatusCode: 400, RequestID: d74a73b0-7d91-47db-8061-78d618e271bf, DataUnavailableException: Insufficient amount of historical data.
-# Unable to inspect table 'aws_cost_usage'
-# The error was: rpc error: code = Internal desc = aws: rpc error: code = Internal desc = 'List' call for table 'aws_cost_usage' is missing 3 required quals: 
-    column:'granularity' operator: =
-    column:'dimension_type_1' operator: =
-    column:'dimension_type_2' operator: =
 
 
 
@@ -4465,7 +4442,7 @@ class AwsEc2LoadBalancerListener(models.Model):
 
 class AwsEc2ManagedPrefixList(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The name of the prefix list.')
-    id = models.TextField(blank=True, null=True, db_comment='The ID of the prefix list.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The ID of the prefix list.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) for the prefix list.')
     state = models.TextField(blank=True, null=True, db_comment='The current state of the prefix list.')
     address_family = models.TextField(blank=True, null=True, db_comment='The IP address version of the prefix list.')
@@ -4900,10 +4877,6 @@ class AwsEcrImage(models.Model):
         managed = False
         db_table = 'aws_ecr_image'
         db_table_comment = 'AWS ECR Image'
-# Unable to inspect table 'aws_ecr_image_scan_finding'
-# The error was: rpc error: code = Internal desc = aws: rpc error: code = Internal desc = 'List' call for table 'aws_ecr_image_scan_finding' is missing 2 required quals: 
-    column:'repository_name' operator: =
-    column:'image_tag' operator: =
 
 
 
@@ -6013,7 +5986,7 @@ class AwsEmrBlockPublicAccessConfiguration(models.Model):
 
 class AwsEmrCluster(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The name of the cluster.')
-    id = models.TextField(blank=True, null=True, db_comment='The unique identifier for the cluster.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The unique identifier for the cluster.')
     cluster_arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name of the cluster.')
     state = models.TextField(blank=True, null=True, db_comment='The current state of the cluster.')
     status = models.JSONField(blank=True, null=True, db_comment='The current status details about the cluster.')
@@ -6060,7 +6033,7 @@ class AwsEmrCluster(models.Model):
 
 
 class AwsEmrClusterMetricIsIdle(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The unique identifier for the cluster.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The unique identifier for the cluster.')
     metric_name = models.TextField(blank=True, null=True, db_comment='The name of the metric.')
     namespace = models.TextField(blank=True, null=True, db_comment='The metric namespace.')
     average = models.FloatField(blank=True, null=True, db_comment='The average of the metric values that correspond to the data point.')
@@ -6084,7 +6057,7 @@ class AwsEmrClusterMetricIsIdle(models.Model):
 
 
 class AwsEmrInstance(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The unique identifier for the instance in Amazon EMR.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The unique identifier for the instance in Amazon EMR.')
     cluster_id = models.TextField(blank=True, null=True, db_comment='The unique identifier for the cluster.')
     ec2_instance_id = models.TextField(blank=True, null=True, db_comment='The unique identifier of the instance in Amazon EC2.')
     state = models.TextField(blank=True, null=True, db_comment='The current state of the instance.')
@@ -6116,7 +6089,7 @@ class AwsEmrInstance(models.Model):
 
 class AwsEmrInstanceFleet(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The name of the instance fleet.')
-    id = models.TextField(blank=True, null=True, db_comment='The identifier of the instance fleet.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The identifier of the instance fleet.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) specifying the instance fleet.')
     cluster_id = models.TextField(blank=True, null=True, db_comment='The unique identifier for the cluster.')
     instance_fleet_type = models.TextField(blank=True, null=True, db_comment='The type of the instance fleet. Valid values are MASTER, CORE or TASK.')
@@ -6146,7 +6119,7 @@ class AwsEmrInstanceFleet(models.Model):
 
 class AwsEmrInstanceGroup(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The name of the instance group.')
-    id = models.TextField(blank=True, null=True, db_comment='The identifier of the instance group.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The identifier of the instance group.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) specifying the instance group.')
     cluster_id = models.TextField(blank=True, null=True, db_comment='The unique identifier for the cluster.')
     instance_group_type = models.TextField(blank=True, null=True, db_comment='The type of the instance group. Valid values are MASTER, CORE or TASK.')
@@ -6713,7 +6686,7 @@ class AwsGuarddutyFilter(models.Model):
 
 class AwsGuarddutyFinding(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The title of the finding.')
-    id = models.TextField(blank=True, null=True, db_comment='The ID of the finding.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The ID of the finding.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) specifying the finding.')
     detector_id = models.TextField(blank=True, null=True, db_comment='The ID of the detector.')
     severity = models.FloatField(blank=True, null=True, db_comment='The severity of the finding.')
@@ -7067,12 +7040,6 @@ class AwsIamPolicyAttachment(models.Model):
         managed = False
         db_table = 'aws_iam_policy_attachment'
         db_table_comment = 'AWS IAM Policy Attachment'
-# Unable to inspect table 'aws_iam_policy_simulator'
-# The error was: rpc error: code = Internal desc = aws: rpc error: code = Internal desc = 'List' call for table 'aws_iam_policy_simulator' is missing 3 required quals: 
-    column:'principal_arn' operator: =
-    column:'action' operator: =
-    column:'resource_arn' operator: =
-
 
 
 class AwsIamRole(models.Model):
@@ -7482,7 +7449,7 @@ class AwsInspectorExclusion(models.Model):
 
 
 class AwsInspectorFinding(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The ID of the finding.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The ID of the finding.')
     arn = models.TextField(blank=True, null=True, db_comment='The ARN that specifies the finding.')
     agent_id = models.TextField(blank=True, null=True, db_comment='The ID of the agent that is installed on the EC2 instance where the finding is generated.')
     asset_type = models.TextField(blank=True, null=True, db_comment='The type of the host from which the finding is generated.')
@@ -8420,7 +8387,7 @@ class AwsNetworkfirewallFirewall(models.Model):
     vpc_id = models.TextField(blank=True, null=True, db_comment='The unique identifier of the VPC where the firewall is in use.')
     delete_protection = models.BooleanField(blank=True, null=True, db_comment='A flag indicating whether it is possible to delete the firewall.')
     description = models.TextField(blank=True, null=True, db_comment='A description of the firewall.')
-    id = models.TextField(blank=True, null=True, db_comment='The unique identifier for the firewall.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The unique identifier for the firewall.')
     policy_arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) of the firewall policy.')
     policy_change_protection = models.BooleanField(blank=True, null=True, db_comment='A setting indicating whether the firewall is protected against a change to the firewall policy association.')
     subnet_change_protection = models.BooleanField(blank=True, null=True, db_comment='A setting indicating whether the firewall is protected against changes to the subnet associations.')
@@ -8505,7 +8472,7 @@ class AwsNetworkfirewallRuleGroup(models.Model):
 
 
 class AwsOamLink(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The random ID string that Amazon Web Service generates as part of the link ARN.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The random ID string that Amazon Web Service generates as part of the link ARN.')
     arn = models.TextField(blank=True, null=True, db_comment='The ARN of the link.')
     sink_arn = models.TextField(blank=True, null=True, db_comment='The ARN of the sink that this link is attached to.')
     label = models.TextField(blank=True, null=True, db_comment='The label that was assigned to this link at creation, with the variables resolved to their actual values.')
@@ -8528,7 +8495,7 @@ class AwsOamLink(models.Model):
 
 
 class AwsOamSink(models.Model):
-    name = models.TextField(blank=True, null=True, db_comment='The name of the sink.')
+    name = models.TextField(blank=True, null=False, primary_key=True, db_comment='The name of the sink.')
     id = models.TextField(blank=True, null=True, db_comment='The random ID string that Amazon Web Service generates as part of the sink ARN.')
     arn = models.TextField(blank=True, null=True, db_comment='The ARN of the sink.')
     title = models.TextField(blank=True, null=True, db_comment='Title of the resource.')
@@ -8592,7 +8559,7 @@ class AwsOpensearchDomain(models.Model):
 
 class AwsOrganizationsAccount(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The friendly name of the account.')
-    id = models.TextField(blank=True, null=True, db_comment='The unique identifier (account ID) of the member account.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The unique identifier (account ID) of the member account.')
     parent_id = models.TextField(blank=True, null=True, db_comment='The unique identifier (ID) for the parent root or organization unit (OU) whose accounts you want to list.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) of the account.')
     status = models.TextField(blank=True, null=True, db_comment='The status of the account in the organization.')
@@ -8618,7 +8585,7 @@ class AwsOrganizationsAccount(models.Model):
 
 class AwsOrganizationsOrganizationalUnit(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The friendly name of this OU.')
-    id = models.TextField(blank=True, null=True, db_comment='The unique identifier (ID) associated with this OU.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The unique identifier (ID) associated with this OU.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) of this OU.')
     parent_id = models.TextField(blank=True, null=True, db_comment='The unique identifier (ID) of the root or OU whose child OUs you want to list.')
     path = models.TextField(blank=True, null=True, db_comment='The OU path is a string representation that uniquely identifies the hierarchical location of an Organizational Unit within the AWS Organizations structure.')  # This field type is a guess.
@@ -8635,19 +8602,12 @@ class AwsOrganizationsOrganizationalUnit(models.Model):
         managed = False
         db_table = 'aws_organizations_organizational_unit'
         db_table_comment = 'AWS Organizations Organizational Unit'
-# Unable to inspect table 'aws_organizations_policy'
-# The error was: rpc error: code = Internal desc = aws: rpc error: code = Internal desc = 'List' call for table 'aws_organizations_policy' is missing 1 required qual: column:'type' operator: =
-
-# Unable to inspect table 'aws_organizations_policy_target'
-# The error was: rpc error: code = Internal desc = aws: rpc error: code = Internal desc = 'List' call for table 'aws_organizations_policy_target' is missing 2 required quals: 
-    column:'type' operator: =
-    column:'target_id' operator: =
 
 
 
 class AwsOrganizationsRoot(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The friendly name of the root.')
-    id = models.TextField(blank=True, null=True, db_comment='The unique identifier (ID) for the root.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The unique identifier (ID) for the root.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) of the root.')
     policy_types = models.JSONField(blank=True, null=True, db_comment='The types of policies that are currently enabled for the root and therefore can be attached to the root or to its OUs or accounts.')
     title = models.TextField(blank=True, null=True, db_comment='Title of the resource.')
@@ -8666,7 +8626,7 @@ class AwsOrganizationsRoot(models.Model):
 
 
 class AwsPinpointApp(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The unique identifier for the application.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The unique identifier for the application.')
     name = models.TextField(blank=True, null=True, db_comment='The display name of the application.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) of the application.')
     last_modified_date = models.DateTimeField(blank=True, null=True, db_comment="The date and time, in ISO 8601 format, when the application's settings were last modified.")
@@ -9971,7 +9931,7 @@ class AwsRoute53Domain(models.Model):
 
 
 class AwsRoute53HealthCheck(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The identifier that Amazon Route 53 assigned to the health check.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The identifier that Amazon Route 53 assigned to the health check.')
     caller_reference = models.TextField(blank=True, null=True, db_comment='A unique string that you specified when you created the health check.')
     health_check_version = models.BigIntegerField(blank=True, null=True, db_comment='The version of the health check.')
     linked_service_principal = models.TextField(blank=True, null=True, db_comment='If the health check was created by another service, the service that created the resource.')
@@ -9997,7 +9957,7 @@ class AwsRoute53HealthCheck(models.Model):
 
 
 class AwsRoute53QueryLog(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The ID for a configuration for DNS query logging.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The ID for a configuration for DNS query logging.')
     hosted_zone_id = models.TextField(blank=True, null=True, db_comment='The ID of the hosted zone that CloudWatch Logs is logging queries for.')
     cloud_watch_logs_log_group_arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) of the CloudWatch Logs log group that Amazon Route 53 is publishing logs to.')
     title = models.TextField(blank=True, null=True, db_comment='Title of the resource.')
@@ -10047,7 +10007,7 @@ class AwsRoute53Record(models.Model):
 
 class AwsRoute53ResolverEndpoint(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The name that you assigned to the Resolver endpoint when you submitted a CreateResolverEndpoint.')
-    id = models.TextField(blank=True, null=True, db_comment='The ID of the Resolver endpoint.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The ID of the Resolver endpoint.')
     arn = models.TextField(blank=True, null=True, db_comment='The ARN (Amazon Resource Name) for the Resolver endpoint.')
     creation_time = models.TextField(blank=True, null=True, db_comment='The date and time that the endpoint was created, in Unix time format and Coordinated Universal Time (UTC).')
     creator_request_id = models.TextField(blank=True, null=True, db_comment='A unique string that identifies the request that created the Resolver endpoint.The CreatorRequestId allows failed requests to be retried without the risk of executing the operation twice.')
@@ -10077,7 +10037,7 @@ class AwsRoute53ResolverEndpoint(models.Model):
 
 
 class AwsRoute53ResolverQueryLogConfig(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The ID for the query logging configuration.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The ID for the query logging configuration.')
     name = models.TextField(blank=True, null=True, db_comment='The name of the query logging configuration.')
     arn = models.TextField(blank=True, null=True, db_comment='The ARN (Amazon Resource Name) for the query logging configuration.')
     creation_time = models.DateTimeField(blank=True, null=True, db_comment='The date and time that the query logging configuration was created, in Unix time format and Coordinated Universal Time (UTC).')
@@ -10105,7 +10065,7 @@ class AwsRoute53ResolverQueryLogConfig(models.Model):
 
 class AwsRoute53ResolverRule(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The name for the Resolver rule, which you specified when you created the Resolver rule.')
-    id = models.TextField(blank=True, null=True, db_comment='The ID that Resolver assigned to the Resolver rule when you created it.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The ID that Resolver assigned to the Resolver rule when you created it.')
     arn = models.TextField(blank=True, null=True, db_comment='The ARN (Amazon Resource Name) for the Resolver rule specified by Id.')
     status = models.TextField(blank=True, null=True, db_comment='A code that specifies the current status of the Resolver rule.')
     creator_request_id = models.TextField(blank=True, null=True, db_comment='A unique string that you specified when you created the Resolver rule. CreatorRequestId identifies the request and allows failed requests to be retried without the risk of executing the operation twice.')
@@ -10138,7 +10098,7 @@ class AwsRoute53ResolverRule(models.Model):
 
 class AwsRoute53TrafficPolicy(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The name that you specified when traffic policy was created.')
-    id = models.TextField(blank=True, null=True, db_comment='The ID that Amazon Route 53 assigned to a traffic policy when it was created.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The ID that Amazon Route 53 assigned to a traffic policy when it was created.')
     type = models.TextField(blank=True, null=True, db_comment='The DNS type of the resource record sets that Amazon Route 53 creates when you use a traffic policy to create a traffic policy instance.')
     version = models.BigIntegerField(blank=True, null=True, db_comment='The version number that Amazon Route 53 assigns to a traffic policy.')
     comment = models.TextField(blank=True, null=True, db_comment='The comment that you specified when traffic policy was created.')
@@ -10160,7 +10120,7 @@ class AwsRoute53TrafficPolicy(models.Model):
 
 class AwsRoute53TrafficPolicyInstance(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The DNS name for which Amazon Route 53 responds to queries.')
-    id = models.TextField(blank=True, null=True, db_comment='The id that Amazon Route 53 assigned to the new traffic policy instance.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The id that Amazon Route 53 assigned to the new traffic policy instance.')
     hosted_zone_id = models.TextField(blank=True, null=True, db_comment='The id of the hosted zone that Amazon Route 53 created resource record sets in.')
     message = models.TextField(blank=True, null=True, db_comment='If State is Failed, an explanation of the reason for the failure.')
     state = models.TextField(blank=True, null=True, db_comment='Current state of the instance.')
@@ -10203,7 +10163,7 @@ class AwsRoute53VpcAssociationAuthorization(models.Model):
 
 class AwsRoute53Zone(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The name of the domain. For public hosted zones, this is the name that is registered with your DNS registrar.')
-    id = models.TextField(blank=True, null=True, db_comment='The ID that Amazon Route 53 assigned to the hosted zone when it was created.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The ID that Amazon Route 53 assigned to the hosted zone when it was created.')
     caller_reference = models.TextField(blank=True, null=True, db_comment='The value that you specified for CallerReference when you created the hosted zone.')
     comment = models.TextField(blank=True, null=True, db_comment='A comment for the zone.')
     private_zone = models.BooleanField(blank=True, null=True, db_comment='If true, the zone is Private hosted Zone, otherwise it is public.')
@@ -10321,7 +10281,7 @@ class AwsS3Bucket(models.Model):
 
 
 class AwsS3BucketIntelligentTieringConfiguration(models.Model):
-    bucket_name = models.TextField(blank=True, null=True, db_comment='The name of the container bucket of this object.')
+    bucket_name = models.TextField(blank=True, null=False, primary_key=True, db_comment='The name of the container bucket of this object.')
     id = models.TextField(blank=True, null=True, db_comment='The ID used to identify the S3 Intelligent-Tiering configuration.')
     status = models.TextField(blank=True, null=True, db_comment='Specifies the status of the configuration.')
     tierings = models.JSONField(blank=True, null=True, db_comment='Specifies the S3 Intelligent-Tiering storage class tier of the configuration.')
@@ -10396,7 +10356,7 @@ class AwsSagemakerApp(models.Model):
 
 
 class AwsSagemakerDomain(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The domain ID.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The domain ID.')
     name = models.TextField(blank=True, null=True, db_comment='The domain name.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) of the domain.')
     creation_time = models.DateTimeField(blank=True, null=True, db_comment='A timestamp that indicates when the domain was created.')
@@ -10633,7 +10593,7 @@ class AwsSecurityhubActionTarget(models.Model):
 
 
 class AwsSecurityhubFinding(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The security findings provider-specific identifier for a finding.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The security findings provider-specific identifier for a finding.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) for the finding.')
     company_name = models.TextField(blank=True, null=True, db_comment='The name of the company for the product that generated the finding.')
     confidence = models.BigIntegerField(blank=True, null=True, db_comment="A finding's confidence. Confidence is defined as the likelihood that a finding accurately identifies the behavior or issue that it was intended to identify.")
@@ -10878,7 +10838,7 @@ class AwsServerlessapplicationrepositoryApplication(models.Model):
 
 
 class AwsServiceDiscoveryInstance(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The ID of the instance.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The ID of the instance.')
     service_id = models.TextField(blank=True, null=True, db_comment='The ID of the service.')
     ec2_instance_id = models.TextField(blank=True, null=True, db_comment='The Amazon EC2 instance ID for the instance. When the AWS_EC2_INSTANCE_ID attribute is specified, then the AWS_INSTANCE_IPV4 attribute contains the primary private IPv4 address.')
     alias_dns_name = models.TextField(blank=True, null=True, db_comment="For an alias record that routes traffic to an Elastic Load Balancing load balancer, the DNS name that's associated with the load balancer.")
@@ -10904,7 +10864,7 @@ class AwsServiceDiscoveryInstance(models.Model):
 
 class AwsServiceDiscoveryNamespace(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The name of the namespace.')
-    id = models.TextField(blank=True, null=True, db_comment='The ID of the namespace.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The ID of the namespace.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) that Cloud Map assigns to the namespace when you create it.')
     create_date = models.DateTimeField(blank=True, null=True, db_comment='The date and time that the namespace was created.')
     description = models.TextField(blank=True, null=True, db_comment='A description for the namespace.')
@@ -10931,7 +10891,7 @@ class AwsServiceDiscoveryNamespace(models.Model):
 
 class AwsServiceDiscoveryService(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The name of the service.')
-    id = models.TextField(blank=True, null=True, db_comment='The ID that Cloud Map assigned to the service when you created it.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The ID that Cloud Map assigned to the service when you created it.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) that Cloud Map assigns to the service when you create it.')
     create_date = models.DateTimeField(blank=True, null=True, db_comment='The date and time that the service was created.')
     description = models.TextField(blank=True, null=True, db_comment='A description for the service.')
@@ -10961,7 +10921,7 @@ class AwsServiceDiscoveryService(models.Model):
 
 class AwsServicecatalogPortfolio(models.Model):
     display_name = models.TextField(blank=True, null=True, db_comment='The name to use for display purposes.')
-    id = models.TextField(blank=True, null=True, db_comment='The portfolio identifier.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The portfolio identifier.')
     arn = models.TextField(blank=True, null=True, db_comment='The ARN assigned to the portfolio.')
     created_time = models.DateTimeField(blank=True, null=True, db_comment='The UTC timestamp of the creation time.')
     description = models.TextField(blank=True, null=True, db_comment='The description of the portfolio.')
@@ -10987,7 +10947,7 @@ class AwsServicecatalogPortfolio(models.Model):
 
 class AwsServicecatalogProduct(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The name of the product.')
-    id = models.TextField(blank=True, null=True, db_comment='The product view identifier.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The product view identifier.')
     product_id = models.TextField(blank=True, null=True, db_comment='The product identifier.')
     source_product_id = models.TextField(blank=True, null=True, db_comment='The source product identifier.')
     distributor = models.TextField(blank=True, null=True, db_comment='The distributor of the product. Contact the product administrator for the significance of this value.')
@@ -11020,7 +10980,7 @@ class AwsServicecatalogProduct(models.Model):
 
 class AwsServicecatalogProvisionedProduct(models.Model):
     arn = models.TextField(blank=True, null=True, db_comment='The ARN of the provisioned product.')
-    id = models.TextField(blank=True, null=True, db_comment='The identifier of the provisioned product.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The identifier of the provisioned product.')
     created_time = models.DateTimeField(blank=True, null=True, db_comment='The UTC time stamp of the creation time.')
     idempotency_token = models.TextField(blank=True, null=True, db_comment='A unique identifier that you provide to ensure idempotency. If multiple requests differ only by the idempotency token, the same response is returned for each repeated request.')
     last_provisioning_record_id = models.TextField(blank=True, null=True, db_comment='The record identifier of the last request performed on this provisioned product.')
@@ -11127,7 +11087,7 @@ class AwsServicequotasServiceQuota(models.Model):
 
 
 class AwsServicequotasServiceQuotaChangeRequest(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The unique identifier.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The unique identifier.')
     case_id = models.TextField(blank=True, null=True, db_comment='The case ID.')
     status = models.TextField(blank=True, null=True, db_comment='The state of the quota increase request.')
     quota_name = models.TextField(blank=True, null=True, db_comment='The quota name.')
@@ -11257,7 +11217,7 @@ class AwsSfnStateMachineExecution(models.Model):
 
 
 class AwsSfnStateMachineExecutionHistory(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The id of the event.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The id of the event.')
     execution_arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) that identifies the execution.')
     previous_event_id = models.TextField(blank=True, null=True, db_comment='The id of the previous event.')
     timestamp = models.DateTimeField(blank=True, null=True, db_comment='The date and time the event occurred.')
@@ -11563,7 +11523,7 @@ class AwsSsmDocument(models.Model):
 
 
 class AwsSsmInventory(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='ID of the inventory result entity.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='ID of the inventory result entity.')
     type_name = models.TextField(blank=True, null=True, db_comment='The type of inventory item returned by the request.')
     filter_key = models.TextField(blank=True, null=True, db_comment="The name of the filter key. Example: inventory filter key where managed node ID 'AWS:InstanceInformation.InstanceId'.")
     filter_value = models.TextField(blank=True, null=True, db_comment="Inventory filter values. Example: inventory filter where managed node IDs are specified as values 'i-a12b3c4d5e6g'.")
@@ -11830,11 +11790,6 @@ class AwsSsmincidentsResponsePlan(models.Model):
         managed = False
         db_table = 'aws_ssmincidents_response_plan'
         db_table_comment = 'AWS SSMIncidents Response Plan'
-# Unable to inspect table 'aws_ssoadmin_account_assignment'
-# The error was: rpc error: code = Internal desc = aws: rpc error: code = Internal desc = 'List' call for table 'aws_ssoadmin_account_assignment' is missing 2 required quals: 
-    column:'permission_set_arn' operator: =
-    column:'target_account_id' operator: =
-
 
 
 class AwsSsoadminInstance(models.Model):
@@ -12067,7 +12022,7 @@ class AwsVpcDhcpOptions(models.Model):
 
 
 class AwsVpcEgressOnlyInternetGateway(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The ID of the egress-only internet gateway.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The ID of the egress-only internet gateway.')
     attachments = models.JSONField(blank=True, null=True, db_comment='Information about the attachment of the egress-only internet gateway.')
     tags_src = models.JSONField(blank=True, null=True, db_comment='A list of tags that are attached to egress only internet gateway.')
     tags = models.JSONField(blank=True, null=True, db_comment='A map of tags for the resource.')
@@ -12339,7 +12294,7 @@ class AwsVpcNetworkAcl(models.Model):
 
 
 class AwsVpcPeeringConnection(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='The ID of the VPC peering connection.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The ID of the VPC peering connection.')
     status_code = models.TextField(blank=True, null=True, db_comment="The status of the VPC peering connection. Possible values include: 'pending-acceptance', 'failed', 'expired', 'provisioning', 'active', 'deleting', 'deleted' or 'rejected'.")
     accepter_cidr_block = models.TextField(blank=True, null=True, db_comment='The IPv4 CIDR block for the accepter VPC.')  # This field type is a guess.
     accepter_owner_id = models.TextField(blank=True, null=True, db_comment='The ID of the Amazon Web Services account that owns the accepter VPC.')
@@ -12861,7 +12816,7 @@ class AwsWafregionalWebAcl(models.Model):
 class AwsWafv2IpSet(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The name of the IP set.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) of the entity.')
-    id = models.TextField(blank=True, null=True, db_comment='A unique identifier for the IP set.')
+    id = models.TextField(blank=True, null=False, primary_key=True, db_comment='A unique identifier for the IP set.')
     scope = models.TextField(blank=True, null=True, db_comment="Specifies the scope of the IP Set. Possible values are: 'REGIONAL' and 'CLOUDFRONT'.")
     description = models.TextField(blank=True, null=True, db_comment='A description of the IP set that helps with identification.')
     ip_address_version = models.TextField(blank=True, null=True, db_comment="Specifies the IP address type. Possible values are: 'IPV4' and 'IPV6'.")
@@ -12885,7 +12840,7 @@ class AwsWafv2IpSet(models.Model):
 
 
 class AwsWafv2RegexPatternSet(models.Model):
-    name = models.TextField(blank=True, null=True, db_comment='The name of the Regex Pattern set.')
+    name = models.TextField(blank=True, null=False, primary_key=True, db_comment='The name of the Regex Pattern set.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) of the entity.')
     id = models.TextField(blank=True, null=True, db_comment='A unique identifier for the Regex Pattern set.')
     scope = models.TextField(blank=True, null=True, db_comment="Specifies the scope of the Regex Pattern Set. Possible values are: 'REGIONAL' and 'CLOUDFRONT'.")
@@ -12910,7 +12865,7 @@ class AwsWafv2RegexPatternSet(models.Model):
 
 
 class AwsWafv2RuleGroup(models.Model):
-    name = models.TextField(blank=True, null=True, db_comment='The name of the rule group.')
+    name = models.TextField(blank=True, null=False, primary_key=True, db_comment='The name of the rule group.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) of the entity.')
     id = models.TextField(blank=True, null=True, db_comment='A unique identifier for the rule group.')
     scope = models.TextField(blank=True, null=True, db_comment="Specifies the scope of the rule group. Possible values are: 'REGIONAL' and 'CLOUDFRONT'.")
@@ -12937,7 +12892,7 @@ class AwsWafv2RuleGroup(models.Model):
 
 
 class AwsWafv2WebAcl(models.Model):
-    name = models.TextField(blank=True, null=True, db_comment='The name of the Web ACL. You cannot change the name of a Web ACL after you create it.')
+    name = models.TextField(blank=True, null=False, primary_key=True, db_comment='The name of the Web ACL. You cannot change the name of a Web ACL after you create it.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) of the entity.')
     id = models.TextField(blank=True, null=True, db_comment='The unique identifier for the Web ACL.')
     scope = models.TextField(blank=True, null=True, db_comment="Specifies the scope of the Web ACL. Possibles values are: 'REGIONAL' and 'CLOUDFRONT'.")
@@ -13003,7 +12958,6 @@ class AwsWellarchitectedAnswer(models.Model):
 
 
 class AwsWellarchitectedCheckDetail(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='Trusted Advisor check ID.')
     choice_id = models.TextField(blank=True, null=True, db_comment='The ID of a choice.')
     description = models.TextField(blank=True, null=True, db_comment='Trusted Advisor check description.')
     flagged_resources = models.BigIntegerField(blank=True, null=True, db_comment='Count of flagged resources associated to the check.')
@@ -13032,7 +12986,6 @@ class AwsWellarchitectedCheckDetail(models.Model):
 
 
 class AwsWellarchitectedCheckSummary(models.Model):
-    id = models.TextField(blank=True, null=True, db_comment='Trusted Advisor check ID.')
     choice_id = models.TextField(blank=True, null=True, db_comment='The ID of a choice.')
     description = models.TextField(blank=True, null=True, db_comment='Trusted Advisor check description.')
     lens_arn = models.TextField(blank=True, null=True, db_comment='Well-Architected Lens ARN associated to the check.')
@@ -13556,7 +13509,7 @@ class SteampipePluginLimiter(models.Model):
 
 
 class SteampipeScanMetadata(models.Model):
-    id = models.BigIntegerField(blank=True, null=True)
+    id = models.BigIntegerField(blank=True, null=False, primary_key=True)
     table = models.TextField(blank=True, null=True)
     cache_hit = models.BooleanField(blank=True, null=True)
     rows_fetched = models.BigIntegerField(blank=True, null=True)
