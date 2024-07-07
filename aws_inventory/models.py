@@ -78,7 +78,7 @@ class AuthUserUserPermissions(models.Model):
 
 
 class AwsAccessanalyzerAnalyzer(models.Model):
-    name = models.TextField(blank=True, null=True, db_comment='The name of the Analyzer.')
+    name = models.TextField(blank=True, null=False, primary_key=True, db_comment='The name of the Analyzer.')
     arn = models.TextField(blank=True, null=True, db_comment='The ARN of the analyzer.')
     status = models.TextField(blank=True, null=True, db_comment='The status of the analyzer.')
     type = models.TextField(blank=True, null=True, db_comment='The type of analyzer, which corresponds to the zone of trust chosen for the analyzer.')
@@ -168,7 +168,7 @@ class AwsAccountAlternateContact(models.Model):
     title = models.TextField(blank=True, null=True, db_comment='Title of the resource.')
     partition = models.TextField(blank=True, null=True, db_comment='The AWS partition in which the resource is located (aws, aws-cn, or aws-us-gov).')
     region = models.TextField(blank=True, null=True, db_comment='The AWS Region in which the resource is located.')
-    account_id = models.TextField(blank=True, null=True, db_comment='The AWS Account ID in which the resource is located.')
+    account_id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The AWS Account ID in which the resource is located.')
     sp_connection_name = models.TextField(blank=True, null=True, db_comment='Steampipe connection name.')
     sp_ctx = models.JSONField(blank=True, null=True, db_comment='Steampipe context in JSON form.')
     field_ctx = models.JSONField(db_column='_ctx', blank=True, null=True, db_comment='Steampipe context in JSON form.')  # Field renamed because it started with '_'.
@@ -196,7 +196,7 @@ class AwsAccountContact(models.Model):
     title = models.TextField(blank=True, null=True, db_comment='Title of the resource.')
     partition = models.TextField(blank=True, null=True, db_comment='The AWS partition in which the resource is located (aws, aws-cn, or aws-us-gov).')
     region = models.TextField(blank=True, null=True, db_comment='The AWS Region in which the resource is located.')
-    account_id = models.TextField(blank=True, null=True, db_comment='The AWS Account ID in which the resource is located.')
+    account_id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The AWS Account ID in which the resource is located.')
     sp_connection_name = models.TextField(blank=True, null=True, db_comment='Steampipe connection name.')
     sp_ctx = models.JSONField(blank=True, null=True, db_comment='Steampipe context in JSON form.')
     field_ctx = models.JSONField(db_column='_ctx', blank=True, null=True, db_comment='Steampipe context in JSON form.')  # Field renamed because it started with '_'.
@@ -208,7 +208,7 @@ class AwsAccountContact(models.Model):
 
 
 class AwsAcmCertificate(models.Model):
-    certificate_arn = models.TextField(blank=True, null=True, db_comment='Amazon Resource Name (ARN) of the certificate. This is of the form: arn:aws:acm:region:123456789012:certificate/12345678-1234-1234-1234-123456789012')
+    certificate_arn = models.TextField(blank=True, null=False, primary_key=True, db_comment='Amazon Resource Name (ARN) of the certificate. This is of the form: arn:aws:acm:region:123456789012:certificate/12345678-1234-1234-1234-123456789012')
     certificate = models.TextField(blank=True, null=True, db_comment='The ACM-issued certificate corresponding to the ARN specified as input')
     certificate_chain = models.TextField(blank=True, null=True, db_comment='The ACM-issued certificate corresponding to the ARN specified as input')
     domain_name = models.TextField(blank=True, null=True, db_comment='Fully qualified domain name (FQDN), such as www.example.com or example.com, for the certificate')
@@ -251,7 +251,7 @@ class AwsAcmCertificate(models.Model):
 
 
 class AwsAcmpcaCertificateAuthority(models.Model):
-    arn = models.TextField(blank=True, null=True, db_comment='Amazon Resource Name (ARN) for your private certificate authority (CA). The format is 12345678-1234-1234-1234-123456789012.')
+    arn = models.TextField(blank=True, null=False, primary_key=True, db_comment='Amazon Resource Name (ARN) for your private certificate authority (CA). The format is 12345678-1234-1234-1234-123456789012.')
     created_at = models.DateTimeField(blank=True, null=True, db_comment='Date and time at which your private CA was created.')
     failure_reason = models.TextField(blank=True, null=True, db_comment='Reason the request to create your private CA failed.')
     key_storage_security_standard = models.TextField(blank=True, null=True, db_comment="Defines a cryptographic key management compliance standard used for handling CA keys. Default: FIPS_140_2_LEVEL_3_OR_HIGHER Note: Amazon Web Services Region ap-northeast-3 supports only FIPS_140_2_LEVEL_2_OR_HIGHER. You must explicitly specify this parameter and value when creating a CA in that Region. Specifying a different value (or no value) results in an InvalidArgsException with the message 'A certificate authority cannot be created in this region with the specified security standard.'")
@@ -284,7 +284,7 @@ class AwsAcmpcaCertificateAuthority(models.Model):
 
 
 class AwsAmplifyApp(models.Model):
-    app_id = models.TextField(blank=True, null=True, db_comment='The unique ID of the Amplify app.')
+    app_id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The unique ID of the Amplify app.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) of the Amplify app.')
     name = models.TextField(blank=True, null=True, db_comment='The name for the Amplify app.')
     description = models.TextField(blank=True, null=True, db_comment='The description for the Amplify app.')
@@ -376,7 +376,7 @@ class AwsApiGatewayAuthorizer(models.Model):
 
 
 class AwsApiGatewayDomainName(models.Model):
-    domain_name = models.TextField(blank=True, null=True, db_comment='The custom domain name as an API host name.')
+    domain_name = models.TextField(blank=True, null=False, primary_key=True, db_comment='The custom domain name as an API host name.')
     certificate_arn = models.TextField(blank=True, null=True, db_comment='The reference to an AWS-managed certificate that will be used by edge-optimized endpoint for this domain name.')
     certificate_name = models.TextField(blank=True, null=True, db_comment='The name of the certificate that will be used by edge-optimized endpoint for this domain name.')
     certificate_upload_date = models.DateTimeField(blank=True, null=True, db_comment='The timestamp when the certificate that was used by edge-optimized endpoint for this domain name was uploaded.')
@@ -410,7 +410,7 @@ class AwsApiGatewayDomainName(models.Model):
 
 class AwsApiGatewayMethod(models.Model):
     rest_api_id = models.TextField(blank=True, null=True, db_comment='The string identifier of the associated RestApi.')
-    resource_id = models.TextField(blank=True, null=True, db_comment='The Resource identifier for the Method resource.')
+    resource_id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The Resource identifier for the Method resource.')
     http_method = models.TextField(blank=True, null=True, db_comment="The method's HTTP verb.")
     path = models.TextField(blank=True, null=True, db_comment='The full path for this resource.')
     path_part = models.TextField(blank=True, null=True, db_comment='The last path segment for this resource.')
@@ -440,7 +440,7 @@ class AwsApiGatewayMethod(models.Model):
 
 class AwsApiGatewayRestApi(models.Model):
     name = models.TextField(blank=True, null=True, db_comment="The API's name")
-    api_id = models.TextField(blank=True, null=True, db_comment="The API's identifier. This identifier is unique across all of APIs in API Gateway")
+    api_id = models.TextField(blank=True, null=False, primary_key=True, db_comment="The API's identifier. This identifier is unique across all of APIs in API Gateway")
     version = models.TextField(blank=True, null=True, db_comment='A version identifier for the API')
     api_key_source = models.TextField(blank=True, null=True, db_comment='The source of the API key for metering requests according to a usage plan')
     created_date = models.DateTimeField(blank=True, null=True, db_comment='The timestamp when the API was created')
@@ -469,7 +469,7 @@ class AwsApiGatewayRestApi(models.Model):
 
 
 class AwsApiGatewayStage(models.Model):
-    name = models.TextField(blank=True, null=True, db_comment='The name of the stage.')
+    name = models.TextField(blank=True, null=False, primary_key=True, db_comment='The name of the stage.')
     arn = models.TextField(blank=True, null=True, db_comment='The Amazon Resource Name (ARN) of the  stage.')
     rest_api_id = models.TextField(blank=True, null=True, db_comment='The id of the rest api which contains this stage.')
     deployment_id = models.TextField(blank=True, null=True, db_comment='The identifier of the Deployment that the stage points to.')
@@ -529,7 +529,7 @@ class AwsApiGatewayUsagePlan(models.Model):
 
 class AwsApiGatewayv2Api(models.Model):
     name = models.TextField(blank=True, null=True, db_comment='The name of the API')
-    api_id = models.TextField(blank=True, null=True, db_comment='The API ID')
+    api_id = models.TextField(blank=True, null=False, primary_key=True, db_comment='The API ID')
     api_endpoint = models.TextField(blank=True, null=True, db_comment='The URI of the API, of the form {api-id}.execute-api.{region}.amazonaws.com')
     description = models.TextField(blank=True, null=True, db_comment='The description of the API.')
     protocol_type = models.TextField(blank=True, null=True, db_comment='The API protocol')
