@@ -16,9 +16,14 @@ services:
     ports:
       - "8000:8000"
     environment:
+      - DJANGO_SETTINGS_MODULE=snitch.settings
       - POSTGRES_NAME=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
+      - STEAMPIPE_DATABASE=steampipe
+      - STEAMPIPE_USER=steampipe
+      - STEAMPIPE_PASSWORD=59f5_43d9_8a11
+      - STEAMPIPE_HOST=192.168.1.2
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}

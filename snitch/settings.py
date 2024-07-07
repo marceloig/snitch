@@ -82,6 +82,14 @@ DATABASES = {
         'PASSWORD': os.environ.get('POSTGRES_PASSWORD'),
         'HOST': 'db',
         'PORT': 5432,
+    },
+    'steampipe': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('STEAMPIPE_DATABASE'),
+        'USER': os.environ.get('STEAMPIPE_USER'),
+        'PASSWORD': os.environ.get('STEAMPIPE_PASSWORD'),
+        'HOST': os.environ.get('STEAMPIPE_HOST'),
+        'PORT': 9193,
     }
 }
 
