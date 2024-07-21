@@ -1,14 +1,14 @@
 class AWSInventoryRouter:
     """
     A router to control all database operations on models in the
-    steampipe and contenttypes applications.
+    steampipe.
     """
 
-    route_app_labels = {"aws_inventory", "contenttypes"}
+    route_app_labels = {"aws_inventory"}
 
     def db_for_read(self, model, **hints):
         """
-        Attempts to read auth and contenttypes models go to steampipe.
+        Attempts to read aws_inventory models go to steampipe.
         """
         if model._meta.app_label in self.route_app_labels:
             return "steampipe"
@@ -16,7 +16,7 @@ class AWSInventoryRouter:
 
     def db_for_write(self, model, **hints):
         """
-        Attempts to write auth and contenttypes models go to steampipe.
+        Attempts to write aws_inventory models go to steampipe.
         """
         if model._meta.app_label in self.route_app_labels:
             return "steampipe"
@@ -24,7 +24,7 @@ class AWSInventoryRouter:
 
     def allow_relation(self, obj1, obj2, **hints):
         """
-        Allow relations if a model in the auth or contenttypes apps is
+        Allow relations if a model in the aws_inventory apps is
         involved.
         """
         if (
@@ -36,7 +36,7 @@ class AWSInventoryRouter:
 
     def allow_migrate(self, db, app_label, model_name=None, **hints):
         """
-        Make sure the steampipe and contenttypes apps only appear in the
+        Make sure the aws_inventory apps only appear in the
         'steampipe' database.
         """
         if app_label in self.route_app_labels:

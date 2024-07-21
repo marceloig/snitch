@@ -1,3 +1,7 @@
+secrets:
+  aws_creds:
+    file: ~/.aws
+
 services:
   db:
     image: postgres
@@ -7,16 +11,16 @@ services:
       - POSTGRES_DB=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
-  web:
+  api:
     restart: always
     build: .
-    command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - .:/code
+      - $HOME/.aws:/home/code/.aws
     ports:
       - "8000:8000"
     environment:
-      - DJANGO_SETTINGS_MODULE=snitch.settings
+      - POSTGRES_HOST=db
       - POSTGRES_NAME=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -24,10 +28,8 @@ services:
       - STEAMPIPE_USER=steampipe
       - STEAMPIPE_PASSWORD=59f5_43d9_8a11
       - STEAMPIPE_HOST=192.168.1.2
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
-      - AWS_DEFAULT_REGION=${AWS_REGION}
+      - STEAMPIPE_PORT=9193
+      - AWS_DEFAULT_REGION=us-east-2
     depends_on:
       - db
 volumes:

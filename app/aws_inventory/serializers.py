@@ -1,5 +1,5 @@
 from rest_framework import serializers  
-from .models import AwsAccount  
+from .models import AwsAccount, AwsCloudtrailTrailEvent  
   
 class AwsAccountSerializer(serializers.ModelSerializer):  
     arn = serializers.CharField(max_length=200, required=True)  
@@ -8,4 +8,10 @@ class AwsAccountSerializer(serializers.ModelSerializer):
   
     class Meta:  
         model = AwsAccount  
+        fields = ('__all__')  
+
+class AwsCloudtrailTrailEventSerializer(serializers.ModelSerializer):
+   
+    class Meta:  
+        model = AwsCloudtrailTrailEvent  
         fields = ('__all__')  

@@ -1,0 +1,36 @@
+secrets:
+  aws_creds:
+    file: ~/.aws
+
+services:
+  db:
+    image: postgres
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+  web:
+    restart: always
+    build: .
+    command: python manage.py runserver 0.0.0.0:8080
+    volumes:
+      - .:/code
+      - $HOME/.aws:/home/code/.aws
+    ports:
+      - "8000:8000"
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_NAME=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - STEAMPIPE_DATABASE=steampipe
+      - STEAMPIPE_USER=steampipe
+      - STEAMPIPE_PASSWORD=59f5_43d9_8a11
+      - STEAMPIPE_HOST=192.168.1.2
+      - AWS_DEFAULT_REGION=us-east-2
+    depends_on:
+      - db
+volumes:
+  pg-data:
