@@ -17,13 +17,17 @@ def get_db():
 router = APIRouter()
 
 @router.get("/trails/", response_model=list[schemas.TrailEvent])
-def read_trails( q: Union[str, None] = None, db: Session = Depends(get_db)):
-    trails = crud.get_all_trails(db, 'aws-controltower/CloudTrailLogs')
+def get_all_trails(db: Session = Depends(get_db)):
+    trail = services.TrailService(db)
+    trails = trail.get_all_trails()
     return trails
 
 @router.get("/trails/users", response_model=list[schemas.TrailEvent])
-def read_trails_users( q: Union[str, None] = None, db: Session = Depends(get_db)):
-    trails = crud.get_all_trails_users(db, 'aws-controltower/CloudTrailLogs')
-    trails_users = services.filter_trails_users(trails)
-    
-    return services.build_trails_users(trails_users)
+def get_all_trails_users(db: Session = Depends(get_db)):
+    trail = services.TrailService(db)
+    return trail.get_all_trails_users()
+
+@router.get("/trails/user", response_model=list[schemas.TrailEvent])
+def get_all_trails_user(session_username: str, db: Session = Depends(get_db)):
+    trail = services.TrailService(db)
+    return trail.get_all_trails_user(session_username)

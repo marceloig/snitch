@@ -11,7 +11,6 @@ class TrailEvent(BaseModel):
     event_category: str
     user_agent: str
     user_type: str
-    username: str | None = None
     user_identifier: str | None = None
     user_identity: dict | None = None
     request_parameters: dict | None = None
@@ -19,7 +18,7 @@ class TrailEvent(BaseModel):
     account_id: str
     aws_region: str
 
-    session_user_name: str | None = None
+    session_username: str | None = None
 
     class Config:
         orm_mode = True
