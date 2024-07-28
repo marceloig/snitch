@@ -1,5 +1,6 @@
 from sqlalchemy.schema import FetchedValue
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, JSON, DateTime
+from sqlalchemy import Boolean, Column, Integer, String, DateTime, BigInteger
+from sqlalchemy.dialects.postgresql import JSON
 
 from .database import Base
 
@@ -7,7 +8,8 @@ from .database import Base
 class AwsCloudtrailTrailEvent(Base):
     __tablename__ = "aws_cloudtrail_trail_event"
     
-    timestamp = Column(DateTime, primary_key=True)
+    timestamp_ms = Column(BigInteger, primary_key=True)
+    timestamp = Column(DateTime)
     log_group_name = Column(String)
     source_ip_address = Column(String)
     error_message = Column(String)
@@ -20,6 +22,7 @@ class AwsCloudtrailTrailEvent(Base):
     user_type = Column(String)
     username = Column(String)
     user_identifier = Column(String)
+    user_identity = Column(JSON)
     request_parameters = Column(JSON)
     resources = Column(JSON)
     account_id = Column(String)

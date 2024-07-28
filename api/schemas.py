@@ -13,10 +13,13 @@ class TrailEvent(BaseModel):
     user_type: str
     username: str | None = None
     user_identifier: str | None = None
-    request_parameters: dict
+    user_identity: dict | None = None
+    request_parameters: dict | None = None
     resources: list[dict] | None = None
     account_id: str
     aws_region: str
+
+    session_user_name: str | None = None
 
     class Config:
         orm_mode = True
