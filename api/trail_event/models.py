@@ -1,8 +1,7 @@
-from sqlalchemy.schema import FetchedValue
 from sqlalchemy import Boolean, Column, Integer, String, DateTime, BigInteger
 from sqlalchemy.dialects.postgresql import JSON
 
-from .database import Base
+from ..database import Base
 
 
 class AwsCloudtrailTrailEvent(Base):

@@ -1,4 +1,5 @@
 from . import models
+import json
 
 
 def filter_trails_users(trails: list):
@@ -8,9 +9,9 @@ def filter_trail_user(trail: models.AwsCloudtrailTrailEvent):
     #userIdentity.sessionContext.sessionIssuer.userName
     invoked_by = trail.user_identity.get('invokedBy', False)
     principal_id = trail.user_identity['principalId']
-    session = trail.user_identity['sessionContext']
-    issuer = session.get('sessionIssuer', {})
-    user_name = issuer.get('userName', None)
+    session = trail.user_identity.get('sessionContext', {}) or {}
+    issuer = session.get('sessionIssuer', {}) or {}
+    user_name = issuer.get('userName', None) or {}
     arn = issuer.get('arn', None)
     return user_name and not invoked_by and ('awslambda' not in principal_id) and ('aws-service-role' not in arn)
 
