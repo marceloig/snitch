@@ -1,4 +1,4 @@
-# Amplify + Cloudscape App
+# Snitch
 
 A fullstack application built with **React + Vite**, **AWS Amplify Gen 2**, and **Cloudscape Design System**.
 

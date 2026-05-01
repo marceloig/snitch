@@ -29,3 +29,5 @@ amplifyconfiguration.dart
 
 # Test
 coverage/
+
+.DS_Store
