@@ -13,6 +13,10 @@ import {
   deletePrivilegedPolicyFunction,
   evaluateAccessFunction,
 } from "../functions/verifiedPermissions/resource";
+import {
+  requestAccessFunction,
+  listAccessRequestsFunction,
+} from "../functions/accessRequests/resource";
 
 const schema = a.schema({
   PrincipalType: a.enum(["USER", "GROUP"]),
@@ -72,6 +76,22 @@ const schema = a.schema({
     permissionSetName: a.string(),
   }),
 
+  // Represents a persisted access request record returned from the workflow stack.
+  // The table itself lives in CDK (AccessRequestWorkflow stack) to avoid a
+  // circular dependency between the data and workflow nested stacks.
+  AccessRequestItem: a.customType({
+    id: a.string(),
+    idcUserId: a.string(),
+    accountId: a.string(),
+    permissionSetArn: a.string(),
+    permissionSetName: a.string(),
+    durationMinutes: a.integer(),
+    status: a.string(),
+    stepFunctionExecutionArn: a.string(),
+    createdAt: a.string(),
+    updatedAt: a.string(),
+  }),
+
   // Resolves the caller's own IDC user by matching the JWT email claim.
   // Available to all authenticated users (not just Admins).
   getMyIDCUser: a
@@ -87,6 +107,14 @@ const schema = a.schema({
     .arguments({ idcUserId: a.string().required() })
     .returns(a.ref("PermittedAccess").array())
     .handler(a.handler.function(evaluateAccessFunction))
+    .authorization((allow) => [allow.authenticated()]),
+
+  // Returns all access requests for the given IDC user, newest first.
+  listMyAccessRequests: a
+    .query()
+    .arguments({ idcUserId: a.string().required() })
+    .returns(a.ref("AccessRequestItem").array())
+    .handler(a.handler.function(listAccessRequestsFunction))
     .authorization((allow) => [allow.authenticated()]),
 
   listIDCUsers: a
@@ -162,6 +190,21 @@ const schema = a.schema({
     .returns(a.boolean())
     .handler(a.handler.function(deletePrivilegedPolicyFunction))
     .authorization((allow) => [allow.group("Admins")]),
+
+  // Starts the privileged-access workflow: persists the request in the
+  // workflow-stack DynamoDB table and triggers the Step Function.
+  requestAccess: a
+    .mutation()
+    .arguments({
+      idcUserId: a.string().required(),
+      accountId: a.string().required(),
+      permissionSetArn: a.string().required(),
+      permissionSetName: a.string().required(),
+      durationMinutes: a.integer().required(),
+    })
+    .returns(a.ref("AccessRequestItem"))
+    .handler(a.handler.function(requestAccessFunction))
+    .authorization((allow) => [allow.authenticated()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;

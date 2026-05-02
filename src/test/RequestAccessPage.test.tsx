@@ -3,9 +3,11 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // vi.hoisted ensures mock functions exist before vi.mock factories execute
-const { mockGetMyIDCUser, mockEvaluateMyAccess } = vi.hoisted(() => ({
+const { mockGetMyIDCUser, mockEvaluateMyAccess, mockListMyAccessRequests } = vi.hoisted(() => ({
   mockGetMyIDCUser: vi.fn(),
   mockEvaluateMyAccess: vi.fn(),
+  // Default: returns an empty list so the requests table renders without errors
+  mockListMyAccessRequests: vi.fn().mockResolvedValue({ data: [], errors: undefined }),
 }));
 
 vi.mock("aws-amplify/data", () => ({
@@ -13,7 +15,9 @@ vi.mock("aws-amplify/data", () => ({
     queries: {
       getMyIDCUser: mockGetMyIDCUser,
       evaluateMyAccess: mockEvaluateMyAccess,
+      listMyAccessRequests: mockListMyAccessRequests,
     },
+    mutations: {},
   }),
 }));
 
@@ -49,6 +53,8 @@ function successfulLoad(permitted = [ACCOUNT_1]) {
 describe("RequestAccessPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Restore the default resolved value after clearAllMocks resets it
+    mockListMyAccessRequests.mockResolvedValue({ data: [], errors: undefined });
   });
 
   describe("loading state", () => {
@@ -156,11 +162,12 @@ describe("RequestAccessPage", () => {
       await userEvent.click(screen.getByRole("button", { name: /new request/i }));
     }
 
-    it("renders the Account and Permission Set fields", async () => {
+    it("renders the Account, Permission Set, and Duration fields", async () => {
       await openModal();
       expect(screen.getByText("AWS Account")).toBeInTheDocument();
       // Use getAllByText because the table column header also says "Permission Set"
       expect(screen.getAllByText("Permission Set").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText("Duration (minutes)")).toBeInTheDocument();
     });
 
     it("shows validation errors when submitting an empty form", async () => {
@@ -168,6 +175,9 @@ describe("RequestAccessPage", () => {
       await userEvent.click(screen.getByRole("button", { name: /submit request/i }));
       expect(screen.getByText("Select an account.")).toBeInTheDocument();
       expect(screen.getByText("Select a permission set.")).toBeInTheDocument();
+      expect(
+        screen.getByText(/enter a whole number of minutes greater than 0/i)
+      ).toBeInTheDocument();
     });
 
     it("keeps the modal open after a failed validation", async () => {

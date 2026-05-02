@@ -3,6 +3,7 @@ import { CfnUserPoolGroup } from "aws-cdk-lib/aws-cognito";
 import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Function as LambdaFunction } from "aws-cdk-lib/aws-lambda";
 import { CfnPolicyStore } from "aws-cdk-lib/aws-verifiedpermissions";
+import { setupAccessRequestWorkflow } from "./accessRequestWorkflow";
 import { auth } from "./auth/resource";
 import { data } from "./data/resource";
 import {
@@ -19,6 +20,13 @@ import {
   deletePrivilegedPolicyFunction,
   evaluateAccessFunction,
 } from "./functions/verifiedPermissions/resource";
+import {
+  requestAccessFunction,
+  listAccessRequestsFunction,
+  assignPermissionSetFunction,
+  removePermissionSetFunction,
+  setStatusFailedFunction,
+} from "./functions/accessRequests/resource";
 
 const backend = defineBackend({
   auth,
@@ -33,9 +41,15 @@ const backend = defineBackend({
   updatePrivilegedPolicyFunction,
   deletePrivilegedPolicyFunction,
   evaluateAccessFunction,
+  requestAccessFunction,
+  listAccessRequestsFunction,
+  assignPermissionSetFunction,
+  removePermissionSetFunction,
+  setStatusFailedFunction,
 });
 
-// Admins Cognito group
+// ─── Cognito Admins group ─────────────────────────────────────────────────────
+
 const { userPool } = backend.auth.resources;
 new CfnUserPoolGroup(userPool, "AdminsGroup", {
   userPoolId: userPool.userPoolId,
@@ -43,7 +57,8 @@ new CfnUserPoolGroup(userPool, "AdminsGroup", {
   description: "Administrators with access to privileged policies",
 });
 
-// IAM permissions shared by all AWS-resource Lambda functions
+// ─── AWS resource Lambda permissions ─────────────────────────────────────────
+
 const awsResourcePolicy = new PolicyStatement({
   effect: Effect.ALLOW,
   actions: [
@@ -85,6 +100,8 @@ backend.getMyIDCUserFunction.resources.lambda.addToRolePolicy(
   userPool.userPoolId
 );
 
+// ─── Verified Permissions policy store ───────────────────────────────────────
+
 // Cedar schema for the Snitch namespace:
 //   Principal — Snitch::User (memberOf Group) | Snitch::Group
 //   Resource  — Snitch::Account (memberOf OU) | Snitch::OU (memberOf OU)
@@ -114,7 +131,6 @@ const cedarSchema = {
   },
 };
 
-// AWS Verified Permissions Policy Store (STRICT schema validation).
 // Scoped to the PrivilegedPolicy DynamoDB table so it lives in the data stack.
 const policyStore = new CfnPolicyStore(
   backend.data.resources.tables["PrivilegedPolicy"],
@@ -129,7 +145,6 @@ const policyStore = new CfnPolicyStore(
 const policyStoreArn = policyStore.attrArn;
 const policyStoreId = policyStore.attrPolicyStoreId;
 
-// IAM policy for the three Verified Permissions Lambda functions
 const avpPolicy = new PolicyStatement({
   effect: Effect.ALLOW,
   actions: [
@@ -140,10 +155,9 @@ const avpPolicy = new PolicyStatement({
   resources: [policyStoreArn],
 });
 
-// DynamoDB table reference for direct reads/writes from Lambda
 const privilegedPolicyTable = backend.data.resources.tables["PrivilegedPolicy"];
 
-const ddbPolicy = new PolicyStatement({
+const privilegedPolicyDdbPolicy = new PolicyStatement({
   effect: Effect.ALLOW,
   actions: [
     "dynamodb:GetItem",
@@ -160,7 +174,7 @@ for (const fn of [
   backend.deletePrivilegedPolicyFunction,
 ]) {
   fn.resources.lambda.addToRolePolicy(avpPolicy);
-  fn.resources.lambda.addToRolePolicy(ddbPolicy);
+  fn.resources.lambda.addToRolePolicy(privilegedPolicyDdbPolicy);
   (fn.resources.lambda as LambdaFunction).addEnvironment("AVP_POLICY_STORE_ID", policyStoreId);
   (fn.resources.lambda as LambdaFunction).addEnvironment(
     "PRIVILEGED_POLICY_TABLE_NAME",
@@ -168,33 +182,31 @@ for (const fn of [
   );
 }
 
-// evaluateAccess needs IsAuthorized (not Create/Update/Delete), group membership
-// lookup, and a full table scan to collect all (account, permissionSet) candidates.
-const evaluateAvpPolicy = new PolicyStatement({
-  effect: Effect.ALLOW,
-  actions: ["verifiedpermissions:IsAuthorized"],
-  resources: [policyStoreArn],
-});
-
-const evaluateDdbPolicy = new PolicyStatement({
-  effect: Effect.ALLOW,
-  actions: ["dynamodb:Scan"],
-  resources: [privilegedPolicyTable.tableArn],
-});
-
-const evaluateIdcPolicy = new PolicyStatement({
-  effect: Effect.ALLOW,
-  actions: [
-    "sso:ListInstances",
-    "identitystore:ListUsers",
-    "identitystore:ListGroupMembershipsForMember",
-  ],
-  resources: ["*"],
-});
-
-backend.evaluateAccessFunction.resources.lambda.addToRolePolicy(evaluateAvpPolicy);
-backend.evaluateAccessFunction.resources.lambda.addToRolePolicy(evaluateDdbPolicy);
-backend.evaluateAccessFunction.resources.lambda.addToRolePolicy(evaluateIdcPolicy);
+backend.evaluateAccessFunction.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    effect: Effect.ALLOW,
+    actions: ["verifiedpermissions:IsAuthorized"],
+    resources: [policyStoreArn],
+  })
+);
+backend.evaluateAccessFunction.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    effect: Effect.ALLOW,
+    actions: ["dynamodb:Scan"],
+    resources: [privilegedPolicyTable.tableArn],
+  })
+);
+backend.evaluateAccessFunction.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    effect: Effect.ALLOW,
+    actions: [
+      "sso:ListInstances",
+      "identitystore:ListUsers",
+      "identitystore:ListGroupMembershipsForMember",
+    ],
+    resources: ["*"],
+  })
+);
 (backend.evaluateAccessFunction.resources.lambda as LambdaFunction).addEnvironment(
   "AVP_POLICY_STORE_ID",
   policyStoreId
@@ -203,3 +215,7 @@ backend.evaluateAccessFunction.resources.lambda.addToRolePolicy(evaluateIdcPolic
   "PRIVILEGED_POLICY_TABLE_NAME",
   privilegedPolicyTable.tableName
 );
+
+// ─── Access Request workflow ──────────────────────────────────────────────────
+
+setupAccessRequestWorkflow(backend);

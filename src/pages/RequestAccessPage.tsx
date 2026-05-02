@@ -10,22 +10,48 @@ import ContentLayout from "@cloudscape-design/components/content-layout";
 import Form from "@cloudscape-design/components/form";
 import FormField from "@cloudscape-design/components/form-field";
 import Header from "@cloudscape-design/components/header";
+import Input from "@cloudscape-design/components/input";
 import Modal from "@cloudscape-design/components/modal";
 import Select from "@cloudscape-design/components/select";
 import SpaceBetween from "@cloudscape-design/components/space-between";
 import Spinner from "@cloudscape-design/components/spinner";
+import StatusIndicator from "@cloudscape-design/components/status-indicator";
 import Table from "@cloudscape-design/components/table";
 
 const client = generateClient<Schema>();
 
-// Placeholder type — replace once the AccessRequest backend model is defined
-type AccessRequest = {
+type AccessRequest = NonNullable<
+  Awaited<ReturnType<typeof client.queries.listMyAccessRequests>>["data"]
+>[number];
+
+// Narrowed view used in the table — all display fields are guaranteed strings
+type AccessRequestRow = {
   id: string;
+  idcUserId: string;
   accountId: string;
   permissionSetArn: string;
-  status: "PENDING" | "APPROVED" | "DENIED";
+  permissionSetName: string;
+  durationMinutes: number;
+  status: string;
+  stepFunctionExecutionArn: string | null;
   createdAt: string;
+  updatedAt: string;
 };
+
+function toRow(item: NonNullable<AccessRequest>): AccessRequestRow {
+  return {
+    id: item.id ?? "",
+    idcUserId: item.idcUserId ?? "",
+    accountId: item.accountId ?? "",
+    permissionSetArn: item.permissionSetArn ?? "",
+    permissionSetName: item.permissionSetName ?? "",
+    durationMinutes: item.durationMinutes ?? 0,
+    status: item.status ?? "PENDING",
+    stepFunctionExecutionArn: item.stepFunctionExecutionArn ?? null,
+    createdAt: item.createdAt ?? "",
+    updatedAt: item.updatedAt ?? "",
+  };
+}
 
 type PermittedAccess = NonNullable<
   Awaited<ReturnType<typeof client.queries.evaluateMyAccess>>["data"]
@@ -40,26 +66,50 @@ type LoadState =
 type FormValues = {
   account: SelectProps.Option | null;
   permissionSet: SelectProps.Option | null;
+  durationMinutes: string;
 };
 
-const EMPTY_FORM: FormValues = { account: null, permissionSet: null };
+type FormErrors = {
+  account: string;
+  permissionSet: string;
+  durationMinutes: string;
+};
+
+const EMPTY_FORM: FormValues = { account: null, permissionSet: null, durationMinutes: "" };
+const EMPTY_ERRORS: FormErrors = { account: "", permissionSet: "", durationMinutes: "" };
+
+function requestStatusType(
+  status: string | null | undefined
+): "success" | "pending" | "stopped" | "error" {
+  switch (status) {
+    case "ACTIVE":
+      return "success";
+    case "EXPIRED":
+      return "stopped";
+    case "FAILED":
+      return "error";
+    default:
+      return "pending";
+  }
+}
 
 export function RequestAccessPage() {
-  const [requests] = useState<AccessRequest[]>([]);
-  const [selectedItems, setSelectedItems] = useState<AccessRequest[]>([]);
+  const [requests, setRequests] = useState<AccessRequestRow[]>([]);
+  const [selectedItems, setSelectedItems] = useState<AccessRequestRow[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
 
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [modalOpen, setModalOpen] = useState(false);
   const [formValues, setFormValues] = useState<FormValues>(EMPTY_FORM);
-  const [accountError, setAccountError] = useState("");
-  const [permissionSetError, setPermissionSetError] = useState("");
+  const [formErrors, setFormErrors] = useState<FormErrors>(EMPTY_ERRORS);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   // Step 1: resolve the logged-in user's Cognito email, then find their IDC
   // identity and evaluate what they're permitted to access via AVP.
   const loadPermittedAccess = useCallback(async () => {
     setLoadState({ status: "loading" });
     try {
-      // Resolve IDC user — the Lambda matches by email using the Cognito username
       const idcRes = await client.queries.getMyIDCUser();
       if (idcRes.errors?.length) {
         throw new Error(idcRes.errors.map((e) => e.message).join("; "));
@@ -74,7 +124,6 @@ export function RequestAccessPage() {
       const idcUserId = idcRes.data.id;
       if (!idcUserId) throw new Error("IDC user record is missing an ID");
 
-      // Evaluate permitted (account, permissionSet) pairs via AVP
       const evalRes = await client.queries.evaluateMyAccess({ idcUserId });
       if (evalRes.errors?.length) {
         throw new Error(evalRes.errors.map((e) => e.message).join("; "));
@@ -93,18 +142,39 @@ export function RequestAccessPage() {
     }
   }, []);
 
+  const loadRequests = useCallback(async () => {
+    if (loadState.status !== "ready") return;
+    setRequestsLoading(true);
+    try {
+      const res = await client.queries.listMyAccessRequests({
+        idcUserId: loadState.idcUserId,
+      });
+      setRequests(
+        (res.data ?? []).filter((r): r is NonNullable<typeof r> => r !== null).map(toRow)
+      );
+    } finally {
+      setRequestsLoading(false);
+    }
+  }, [loadState]);
+
   useEffect(() => {
     loadPermittedAccess();
   }, [loadPermittedAccess]);
 
+  // Load requests once the IDC user ID is known (needed for the GSI query)
+  useEffect(() => {
+    if (loadState.status === "ready") {
+      loadRequests();
+    }
+  }, [loadState.status, loadRequests]);
+
   function openModal() {
     setFormValues(EMPTY_FORM);
-    setAccountError("");
-    setPermissionSetError("");
+    setFormErrors(EMPTY_ERRORS);
+    setSubmitError("");
     setModalOpen(true);
   }
 
-  // Derive unique account options from the permitted pairs
   function accountOptions(): SelectProps.Option[] {
     if (loadState.status !== "ready") return [];
     const seen = new Set<string>();
@@ -117,7 +187,6 @@ export function RequestAccessPage() {
       .map((p) => ({ label: p.accountId ?? "", value: p.accountId ?? "" }));
   }
 
-  // Derive permission set options filtered to the selected account
   function permissionSetOptions(): SelectProps.Option[] {
     if (loadState.status !== "ready" || !formValues.account) return [];
     return loadState.permitted
@@ -129,26 +198,65 @@ export function RequestAccessPage() {
   }
 
   function validate(): boolean {
+    const errors: FormErrors = { account: "", permissionSet: "", durationMinutes: "" };
     let valid = true;
+
     if (!formValues.account) {
-      setAccountError("Select an account.");
+      errors.account = "Select an account.";
       valid = false;
-    } else {
-      setAccountError("");
     }
     if (!formValues.permissionSet) {
-      setPermissionSetError("Select a permission set.");
+      errors.permissionSet = "Select a permission set.";
       valid = false;
-    } else {
-      setPermissionSetError("");
     }
+
+    const minutes = Number(formValues.durationMinutes);
+    if (!formValues.durationMinutes || !Number.isInteger(minutes) || minutes <= 0) {
+      errors.durationMinutes = "Enter a whole number of minutes greater than 0.";
+      valid = false;
+    }
+
+    setFormErrors(errors);
     return valid;
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!validate()) return;
-    // TODO: wire up backend mutation once AccessRequest model is defined
-    setModalOpen(false);
+    if (loadState.status !== "ready") return;
+
+    setSubmitting(true);
+    setSubmitError("");
+
+    try {
+      const permittedEntry = loadState.permitted.find(
+        (p) =>
+          p.accountId === formValues.account!.value &&
+          p.permissionSetArn === formValues.permissionSet!.value
+      );
+
+      const res = await client.mutations.requestAccess({
+        idcUserId: loadState.idcUserId,
+        accountId: formValues.account!.value ?? "",
+        permissionSetArn: formValues.permissionSet!.value ?? "",
+        permissionSetName:
+          permittedEntry?.permissionSetName ?? formValues.permissionSet!.label ?? "",
+        durationMinutes: Number(formValues.durationMinutes),
+      });
+
+      if (res.errors?.length) {
+        throw new Error(res.errors.map((e) => e.message).join("; "));
+      }
+
+      setModalOpen(false);
+      // Refresh the requests table to show the new entry
+      await loadRequests();
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error ? err.message : "Failed to submit request. Please try again."
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const isLoading = loadState.status === "loading" || loadState.status === "idle";
@@ -170,9 +278,7 @@ export function RequestAccessPage() {
             <Alert
               type="error"
               header="Could not load access options"
-              action={
-                <Button onClick={loadPermittedAccess}>Retry</Button>
-              }
+              action={<Button onClick={loadPermittedAccess}>Retry</Button>}
             >
               {loadState.message}
             </Alert>
@@ -190,24 +296,34 @@ export function RequestAccessPage() {
               cell: (item) => item.accountId,
             },
             {
-              id: "permissionSetArn",
+              id: "permissionSetName",
               header: "Permission Set",
-              cell: (item) => item.permissionSetArn,
+              cell: (item) => item.permissionSetName,
+            },
+            {
+              id: "durationMinutes",
+              header: "Duration (min)",
+              cell: (item) => item.durationMinutes,
+              width: 120,
             },
             {
               id: "status",
               header: "Status",
-              cell: (item) => item.status,
-              width: 110,
+              cell: (item) => (
+                <StatusIndicator type={requestStatusType(item.status)}>
+                  {item.status ?? "PENDING"}
+                </StatusIndicator>
+              ),
+              width: 130,
             },
             {
               id: "createdAt",
               header: "Requested at",
-              cell: (item) => item.createdAt,
+              cell: (item) => item.createdAt ?? "",
             },
           ]}
           items={requests}
-          loading={false}
+          loading={requestsLoading}
           loadingText="Loading requests..."
           empty={
             <Box textAlign="center" color="inherit">
@@ -222,7 +338,6 @@ export function RequestAccessPage() {
               variant="h2"
               actions={
                 <SpaceBetween direction="horizontal" size="xs">
-                  <Button disabled={selectedItems.length === 0}>Cancel request</Button>
                   <Button
                     variant="primary"
                     onClick={openModal}
@@ -247,10 +362,10 @@ export function RequestAccessPage() {
         footer={
           <Box float="right">
             <SpaceBetween direction="horizontal" size="xs">
-              <Button variant="link" onClick={() => setModalOpen(false)}>
+              <Button variant="link" onClick={() => setModalOpen(false)} disabled={submitting}>
                 Cancel
               </Button>
-              <Button variant="primary" onClick={handleSubmit}>
+              <Button variant="primary" onClick={handleSubmit} loading={submitting}>
                 Submit request
               </Button>
             </SpaceBetween>
@@ -263,16 +378,16 @@ export function RequestAccessPage() {
           </Box>
         ) : loadState.permitted.length === 0 ? (
           <Alert type="info" header="No access available">
-            There are no policies that grant you access to any AWS account. Contact
-            your administrator.
+            There are no policies that grant you access to any AWS account. Contact your
+            administrator.
           </Alert>
         ) : (
-          <Form>
+          <Form errorText={submitError}>
             <SpaceBetween size="l">
               <FormField
                 label="AWS Account"
                 description="The account you want to access."
-                errorText={accountError}
+                errorText={formErrors.account}
               >
                 <Select
                   selectedOption={formValues.account}
@@ -281,6 +396,7 @@ export function RequestAccessPage() {
                       account: detail.selectedOption,
                       // Reset permission set when account changes
                       permissionSet: null,
+                      durationMinutes: formValues.durationMinutes,
                     })
                   }
                   options={accountOptions()}
@@ -293,7 +409,7 @@ export function RequestAccessPage() {
               <FormField
                 label="Permission Set"
                 description="The role you will assume in the selected account."
-                errorText={permissionSetError}
+                errorText={formErrors.permissionSet}
               >
                 <Select
                   selectedOption={formValues.permissionSet}
@@ -306,12 +422,29 @@ export function RequestAccessPage() {
                   options={permissionSetOptions()}
                   filteringType="auto"
                   placeholder={
-                    formValues.account
-                      ? "Select a permission set"
-                      : "Select an account first"
+                    formValues.account ? "Select a permission set" : "Select an account first"
                   }
                   disabled={!formValues.account}
                   empty="No permission sets available for this account"
+                />
+              </FormField>
+
+              <FormField
+                label="Duration (minutes)"
+                description="How long you need access. Must be a whole number."
+                errorText={formErrors.durationMinutes}
+              >
+                <Input
+                  value={formValues.durationMinutes}
+                  onChange={({ detail }) => {
+                    // Only allow digits — prevent decimals and negative signs
+                    if (/^\d*$/.test(detail.value)) {
+                      setFormValues((prev) => ({ ...prev, durationMinutes: detail.value }));
+                    }
+                  }}
+                  inputMode="numeric"
+                  type="number"
+                  placeholder="e.g. 60"
                 />
               </FormField>
             </SpaceBetween>
