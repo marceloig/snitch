@@ -1,5 +1,6 @@
 import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
 import {
+  getMyIDCUserFunction,
   listIDCUsersFunction,
   listIDCGroupsFunction,
   listAWSAccountsFunction,
@@ -10,6 +11,7 @@ import {
   createPrivilegedPolicyFunction,
   updatePrivilegedPolicyFunction,
   deletePrivilegedPolicyFunction,
+  evaluateAccessFunction,
 } from "../functions/verifiedPermissions/resource";
 
 const schema = a.schema({
@@ -62,6 +64,30 @@ const schema = a.schema({
     name: a.string(),
     description: a.string(),
   }),
+
+  // Returned by evaluateMyAccess — one permitted (account, permissionSet) pair
+  PermittedAccess: a.customType({
+    accountId: a.string(),
+    permissionSetArn: a.string(),
+    permissionSetName: a.string(),
+  }),
+
+  // Resolves the caller's own IDC user by matching the JWT email claim.
+  // Available to all authenticated users (not just Admins).
+  getMyIDCUser: a
+    .query()
+    .returns(a.ref("IDCUser"))
+    .handler(a.handler.function(getMyIDCUserFunction))
+    .authorization((allow) => [allow.authenticated()]),
+
+  // Evaluates every (account, permissionSet) combination in the policy table
+  // against AVP for the given IDC user ID and returns only the permitted pairs.
+  evaluateMyAccess: a
+    .query()
+    .arguments({ idcUserId: a.string().required() })
+    .returns(a.ref("PermittedAccess").array())
+    .handler(a.handler.function(evaluateAccessFunction))
+    .authorization((allow) => [allow.authenticated()]),
 
   listIDCUsers: a
     .query()

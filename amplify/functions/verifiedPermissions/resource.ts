@@ -25,3 +25,10 @@ export const deletePrivilegedPolicyFunction = defineFunction({
   timeoutSeconds: TIMEOUT,
   resourceGroupName: "data",
 });
+
+export const evaluateAccessFunction = defineFunction({
+  name: "evaluateAccess",
+  entry: "./evaluateAccessHandler.ts",
+  timeoutSeconds: TIMEOUT,
+  resourceGroupName: "data",
+});

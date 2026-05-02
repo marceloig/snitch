@@ -6,6 +6,7 @@ import { CfnPolicyStore } from "aws-cdk-lib/aws-verifiedpermissions";
 import { auth } from "./auth/resource";
 import { data } from "./data/resource";
 import {
+  getMyIDCUserFunction,
   listIDCUsersFunction,
   listIDCGroupsFunction,
   listAWSAccountsFunction,
@@ -16,11 +17,13 @@ import {
   createPrivilegedPolicyFunction,
   updatePrivilegedPolicyFunction,
   deletePrivilegedPolicyFunction,
+  evaluateAccessFunction,
 } from "./functions/verifiedPermissions/resource";
 
 const backend = defineBackend({
   auth,
   data,
+  getMyIDCUserFunction,
   listIDCUsersFunction,
   listIDCGroupsFunction,
   listAWSAccountsFunction,
@@ -29,6 +32,7 @@ const backend = defineBackend({
   createPrivilegedPolicyFunction,
   updatePrivilegedPolicyFunction,
   deletePrivilegedPolicyFunction,
+  evaluateAccessFunction,
 });
 
 // Admins Cognito group
@@ -56,6 +60,7 @@ const awsResourcePolicy = new PolicyStatement({
 });
 
 for (const fn of [
+  backend.getMyIDCUserFunction,
   backend.listIDCUsersFunction,
   backend.listIDCGroupsFunction,
   backend.listAWSAccountsFunction,
@@ -64,6 +69,21 @@ for (const fn of [
 ]) {
   fn.resources.lambda.addToRolePolicy(awsResourcePolicy);
 }
+
+// getMyIDCUser additionally needs to look up the Cognito user by sub to
+// retrieve the email attribute — required because AppSync may forward the
+// access token (which has no email claim) instead of the ID token.
+backend.getMyIDCUserFunction.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    effect: Effect.ALLOW,
+    actions: ["cognito-idp:AdminGetUser"],
+    resources: [userPool.userPoolArn],
+  })
+);
+(backend.getMyIDCUserFunction.resources.lambda as LambdaFunction).addEnvironment(
+  "AUTH_USER_POOL_ID",
+  userPool.userPoolId
+);
 
 // Cedar schema for the Snitch namespace:
 //   Principal — Snitch::User (memberOf Group) | Snitch::Group
@@ -147,3 +167,39 @@ for (const fn of [
     privilegedPolicyTable.tableName
   );
 }
+
+// evaluateAccess needs IsAuthorized (not Create/Update/Delete), group membership
+// lookup, and a full table scan to collect all (account, permissionSet) candidates.
+const evaluateAvpPolicy = new PolicyStatement({
+  effect: Effect.ALLOW,
+  actions: ["verifiedpermissions:IsAuthorized"],
+  resources: [policyStoreArn],
+});
+
+const evaluateDdbPolicy = new PolicyStatement({
+  effect: Effect.ALLOW,
+  actions: ["dynamodb:Scan"],
+  resources: [privilegedPolicyTable.tableArn],
+});
+
+const evaluateIdcPolicy = new PolicyStatement({
+  effect: Effect.ALLOW,
+  actions: [
+    "sso:ListInstances",
+    "identitystore:ListUsers",
+    "identitystore:ListGroupMembershipsForMember",
+  ],
+  resources: ["*"],
+});
+
+backend.evaluateAccessFunction.resources.lambda.addToRolePolicy(evaluateAvpPolicy);
+backend.evaluateAccessFunction.resources.lambda.addToRolePolicy(evaluateDdbPolicy);
+backend.evaluateAccessFunction.resources.lambda.addToRolePolicy(evaluateIdcPolicy);
+(backend.evaluateAccessFunction.resources.lambda as LambdaFunction).addEnvironment(
+  "AVP_POLICY_STORE_ID",
+  policyStoreId
+);
+(backend.evaluateAccessFunction.resources.lambda as LambdaFunction).addEnvironment(
+  "PRIVILEGED_POLICY_TABLE_NAME",
+  privilegedPolicyTable.tableName
+);

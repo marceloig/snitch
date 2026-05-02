@@ -2,6 +2,12 @@ import { defineFunction } from "@aws-amplify/backend";
 
 const TIMEOUT = 30;
 
+export const getMyIDCUserFunction = defineFunction({
+  name: "getMyIDCUser",
+  entry: "./getMyIDCUserHandler.ts",
+  timeoutSeconds: TIMEOUT,
+});
+
 export const listIDCUsersFunction = defineFunction({
   name: "listIDCUsers",
   entry: "./listIDCUsersHandler.ts",

@@ -8,6 +8,7 @@ import {
   IdentitystoreClient,
   ListUsersCommand,
   ListGroupsCommand,
+  ListGroupMembershipsForMemberCommand,
 } from "@aws-sdk/client-identitystore";
 import {
   OrganizationsClient,
@@ -147,6 +148,58 @@ export async function listOUs() {
 
   return ous;
 }
+
+/**
+ * Finds the single IDC user whose primary email matches the given address.
+ * Returns null when no match is found rather than throwing, so callers can
+ * surface a friendly "not found" message instead of a 500.
+ *
+ * Example: getMyIDCUser("alice@example.com")
+ */
+export async function getMyIDCUser(email: string) {
+  const users = await listIDCUsers();
+  return users.find((u) => u.email === email) ?? null;
+}
+
+/**
+ * Returns the IDC group IDs that the given user belongs to.
+ * Used to build the entity list for AVP IsAuthorized so group-based
+ * Cedar policies are evaluated correctly.
+ *
+ * Example: listGroupMembershipsForUser("identityStoreId", "userId")
+ */
+export async function listGroupMembershipsForUser(
+  identityStoreId: string,
+  userId: string
+): Promise<string[]> {
+  const identityStore = new IdentitystoreClient({ region: REGION });
+  const groupIds: string[] = [];
+  let nextToken: string | undefined;
+
+  do {
+    const result = await identityStore.send(
+      new ListGroupMembershipsForMemberCommand({
+        IdentityStoreId: identityStoreId,
+        MemberId: { UserId: userId },
+        NextToken: nextToken,
+      })
+    );
+    for (const membership of result.GroupMemberships ?? []) {
+      if (membership.GroupId) groupIds.push(membership.GroupId);
+    }
+    nextToken = result.NextToken;
+  } while (nextToken);
+
+  return groupIds;
+}
+
+/**
+ * Returns the IDC instance ARN and identity store ID.
+ * Re-exported so Lambda handlers outside this module can reuse it.
+ *
+ * Example: const { identityStoreId } = await getIDCInstancePublic()
+ */
+export { getIDCInstance as getIDCInstancePublic };
 
 export async function listPermissionSets() {
   const { instanceArn } = await getIDCInstance();
