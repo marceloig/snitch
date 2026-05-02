@@ -167,7 +167,7 @@ describe("RequestAccessPage", () => {
       expect(screen.getByText("AWS Account")).toBeInTheDocument();
       // Use getAllByText because the table column header also says "Permission Set"
       expect(screen.getAllByText("Permission Set").length).toBeGreaterThanOrEqual(1);
-      expect(screen.getByText("Duration (minutes)")).toBeInTheDocument();
+      expect(screen.getByText("Duration")).toBeInTheDocument();
     });
 
     it("shows validation errors when submitting an empty form", async () => {
@@ -176,7 +176,7 @@ describe("RequestAccessPage", () => {
       expect(screen.getByText("Select an account.")).toBeInTheDocument();
       expect(screen.getByText("Select a permission set.")).toBeInTheDocument();
       expect(
-        screen.getByText(/enter a whole number of minutes greater than 0/i)
+        screen.getByText(/enter a duration greater than 0/i)
       ).toBeInTheDocument();
     });
 

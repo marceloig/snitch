@@ -32,6 +32,7 @@ const schema = a.schema({
       ouIds: a.string().array(),
       permissionSetArns: a.string().array(),
       permissionSetNames: a.string().array(),
+      maxDurationMinutes: a.integer(),
       avpPolicyId: a.string(),
     })
     .authorization((allow) => [allow.group("Admins")]),
@@ -74,6 +75,7 @@ const schema = a.schema({
     accountId: a.string(),
     permissionSetArn: a.string(),
     permissionSetName: a.string(),
+    maxDurationMinutes: a.integer(),
   }),
 
   // Represents a persisted access request record returned from the workflow stack.
@@ -161,6 +163,7 @@ const schema = a.schema({
       ouIds: a.string().array(),
       permissionSetArns: a.string().array(),
       permissionSetNames: a.string().array(),
+      maxDurationMinutes: a.integer(),
     })
     .returns(a.ref("PrivilegedPolicy"))
     .handler(a.handler.function(createPrivilegedPolicyFunction))
@@ -179,6 +182,7 @@ const schema = a.schema({
       ouIds: a.string().array(),
       permissionSetArns: a.string().array(),
       permissionSetNames: a.string().array(),
+      maxDurationMinutes: a.integer(),
     })
     .returns(a.ref("PrivilegedPolicy"))
     .handler(a.handler.function(updatePrivilegedPolicyFunction))

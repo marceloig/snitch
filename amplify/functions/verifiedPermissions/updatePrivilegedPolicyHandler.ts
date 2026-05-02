@@ -11,6 +11,7 @@ import {
   UpdatePolicyCommand,
 } from "@aws-sdk/client-verifiedpermissions";
 import { buildCedarPolicy } from "./cedarPolicyBuilder";
+import { assertNoDuplicatePrincipalResource } from "./policyConflictChecker";
 
 const REGION = process.env.AWS_REGION ?? "us-east-1";
 const TABLE_NAME = process.env.PRIVILEGED_POLICY_TABLE_NAME!;
@@ -30,6 +31,7 @@ type UpdateInput = {
   ouIds?: string[] | null;
   permissionSetArns?: string[] | null;
   permissionSetNames?: string[] | null;
+  maxDurationMinutes?: number | null;
 };
 
 type AppSyncEvent = { arguments: UpdateInput };
@@ -49,6 +51,13 @@ export const handler = async (event: AppSyncEvent) => {
   const permissionSetArns = args.permissionSetArns ?? [];
   const updatedAt = new Date().toISOString();
 
+  await assertNoDuplicatePrincipalResource(dynamo, TABLE_NAME, {
+    principalId: args.principalId,
+    accountIds,
+    ouIds,
+    excludeId: args.id,
+  });
+
   // Step 2: Update DynamoDB first
   await dynamo.send(
     new UpdateCommand({
@@ -64,6 +73,7 @@ export const handler = async (event: AppSyncEvent) => {
         "ouIds = :ouIds",
         "permissionSetArns = :permissionSetArns",
         "permissionSetNames = :permissionSetNames",
+        "maxDurationMinutes = :maxDurationMinutes",
         "updatedAt = :updatedAt",
       ].join(", "),
       ExpressionAttributeNames: { "#name": "name" },
@@ -77,6 +87,7 @@ export const handler = async (event: AppSyncEvent) => {
         ":ouIds": ouIds,
         ":permissionSetArns": permissionSetArns,
         ":permissionSetNames": args.permissionSetNames ?? [],
+        ":maxDurationMinutes": args.maxDurationMinutes ?? null,
         ":updatedAt": updatedAt,
       },
     })
@@ -142,6 +153,7 @@ export const handler = async (event: AppSyncEvent) => {
     ouIds,
     permissionSetArns,
     permissionSetNames: args.permissionSetNames ?? [],
+    maxDurationMinutes: args.maxDurationMinutes ?? null,
     avpPolicyId,
     updatedAt,
   };

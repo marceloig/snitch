@@ -6,6 +6,7 @@ import {
   DeletePolicyCommand,
 } from "@aws-sdk/client-verifiedpermissions";
 import { buildCedarPolicy } from "./cedarPolicyBuilder";
+import { assertNoDuplicatePrincipalResource } from "./policyConflictChecker";
 
 const REGION = process.env.AWS_REGION ?? "us-east-1";
 const TABLE_NAME = process.env.PRIVILEGED_POLICY_TABLE_NAME!;
@@ -24,6 +25,7 @@ type CreateInput = {
   ouIds?: string[] | null;
   permissionSetArns?: string[] | null;
   permissionSetNames?: string[] | null;
+  maxDurationMinutes?: number | null;
 };
 
 type AppSyncEvent = { arguments: CreateInput };
@@ -36,6 +38,12 @@ export const handler = async (event: AppSyncEvent) => {
   const accountIds = args.accountIds ?? [];
   const ouIds = args.ouIds ?? [];
   const permissionSetArns = args.permissionSetArns ?? [];
+
+  await assertNoDuplicatePrincipalResource(dynamo, TABLE_NAME, {
+    principalId: args.principalId,
+    accountIds,
+    ouIds,
+  });
 
   // Step 1: Create Cedar policy in AVP first so rollback is a simple delete
   const statement = buildCedarPolicy({
@@ -71,6 +79,7 @@ export const handler = async (event: AppSyncEvent) => {
     ouIds,
     permissionSetArns,
     permissionSetNames: args.permissionSetNames ?? [],
+    maxDurationMinutes: args.maxDurationMinutes ?? null,
     avpPolicyId,
     createdAt: now,
     updatedAt: now,

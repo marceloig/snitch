@@ -23,6 +23,7 @@ export type PermittedAccess = {
   accountId: string;
   permissionSetArn: string;
   permissionSetName: string;
+  maxDurationMinutes: number | null;
 };
 
 /**
@@ -58,26 +59,41 @@ export const handler = async (event: AppSyncEvent): Promise<PermittedAccess[]> =
   const scanResult = await dynamo.send(new ScanCommand({ TableName: TABLE_NAME }));
   const policies = scanResult.Items ?? [];
 
-  type Candidate = { accountId: string; permissionSetArn: string; permissionSetName: string };
-  const seen = new Set<string>();
+  type Candidate = {
+    accountId: string;
+    permissionSetArn: string;
+    permissionSetName: string;
+    maxDurationMinutes: number | null;
+  };
+  const seen = new Map<string, Candidate>();
   const candidates: Candidate[] = [];
 
   for (const policy of policies) {
     const accountIds: string[] = policy.accountIds ?? [];
     const permissionSetArns: string[] = policy.permissionSetArns ?? [];
     const permissionSetNames: string[] = policy.permissionSetNames ?? [];
+    const policyMax: number | null = policy.maxDurationMinutes ?? null;
 
     for (const accountId of accountIds) {
       for (let i = 0; i < permissionSetArns.length; i++) {
         const arn = permissionSetArns[i];
         const key = `${accountId}::${arn}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          candidates.push({
+        const existing = seen.get(key);
+        if (!existing) {
+          const candidate: Candidate = {
             accountId,
             permissionSetArn: arn,
             permissionSetName: permissionSetNames[i] ?? arn,
-          });
+            maxDurationMinutes: policyMax,
+          };
+          seen.set(key, candidate);
+          candidates.push(candidate);
+        } else if (policyMax !== null) {
+          // Use the most restrictive (minimum) max duration across policies
+          existing.maxDurationMinutes =
+            existing.maxDurationMinutes === null
+              ? policyMax
+              : Math.min(existing.maxDurationMinutes, policyMax);
         }
       }
     }

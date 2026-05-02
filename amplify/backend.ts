@@ -168,6 +168,12 @@ const privilegedPolicyDdbPolicy = new PolicyStatement({
   resources: [privilegedPolicyTable.tableArn],
 });
 
+const conflictCheckDdbPolicy = new PolicyStatement({
+  effect: Effect.ALLOW,
+  actions: ["dynamodb:Scan"],
+  resources: [privilegedPolicyTable.tableArn],
+});
+
 for (const fn of [
   backend.createPrivilegedPolicyFunction,
   backend.updatePrivilegedPolicyFunction,
@@ -180,6 +186,13 @@ for (const fn of [
     "PRIVILEGED_POLICY_TABLE_NAME",
     privilegedPolicyTable.tableName
   );
+}
+
+for (const fn of [
+  backend.createPrivilegedPolicyFunction,
+  backend.updatePrivilegedPolicyFunction,
+]) {
+  fn.resources.lambda.addToRolePolicy(conflictCheckDdbPolicy);
 }
 
 backend.evaluateAccessFunction.resources.lambda.addToRolePolicy(

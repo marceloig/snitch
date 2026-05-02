@@ -12,6 +12,7 @@ import FormField from "@cloudscape-design/components/form-field";
 import Header from "@cloudscape-design/components/header";
 import Input from "@cloudscape-design/components/input";
 import Modal from "@cloudscape-design/components/modal";
+import TimeInput from "@cloudscape-design/components/time-input";
 import Multiselect from "@cloudscape-design/components/multiselect";
 import Select from "@cloudscape-design/components/select";
 import SpaceBetween from "@cloudscape-design/components/space-between";
@@ -36,6 +37,7 @@ type FormValues = {
   accounts: readonly Option[];
   ous: readonly Option[];
   permissionSets: readonly Option[];
+  maxDurationMinutes: string;
 };
 
 const EMPTY_FORM: FormValues = {
@@ -46,6 +48,7 @@ const EMPTY_FORM: FormValues = {
   accounts: [],
   ous: [],
   permissionSets: [],
+  maxDurationMinutes: "23:59",
 };
 
 type AWSResources = {
@@ -75,6 +78,7 @@ export function PrivilegedPoliciesPage() {
   const [nameError, setNameError] = useState("");
   const [principalError, setPrincipalError] = useState("");
   const [permissionSetError, setPermissionSetError] = useState("");
+  const [maxDurationError, setMaxDurationError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const [awsResources, setAwsResources] = useState<AWSResources>(EMPTY_RESOURCES);
@@ -172,6 +176,7 @@ export function PrivilegedPoliciesPage() {
     setNameError("");
     setPrincipalError("");
     setPermissionSetError("");
+    setMaxDurationError("");
   }
 
   function openCreateModal() {
@@ -205,6 +210,11 @@ export function PrivilegedPoliciesPage() {
         label: policy.permissionSetNames?.[i] ?? arn ?? "",
         value: arn ?? "",
       })),
+      maxDurationMinutes: policy.maxDurationMinutes
+        ? String(Math.floor(policy.maxDurationMinutes / 60)).padStart(2, "0") +
+          ":" +
+          String(policy.maxDurationMinutes % 60).padStart(2, "0")
+        : "23:59",
     });
 
     clearFormErrors();
@@ -213,6 +223,7 @@ export function PrivilegedPoliciesPage() {
   }
 
   function validate(): boolean {
+    setFormError(null);
     let valid = true;
     if (!formValues.name.trim()) {
       setNameError("Name is required.");
@@ -232,6 +243,47 @@ export function PrivilegedPoliciesPage() {
     } else {
       setPermissionSetError("");
     }
+    if (
+      formValues.maxDurationMinutes !== "" &&
+      !/^\d{2}:\d{2}$/.test(formValues.maxDurationMinutes)
+    ) {
+      setMaxDurationError("Enter a valid duration (hh:mm).");
+      valid = false;
+    } else if (formValues.maxDurationMinutes) {
+      const [h, m] = formValues.maxDurationMinutes.split(":").map(Number);
+      if (h * 60 + m > 1439) {
+        setMaxDurationError("Maximum duration is 23:59.");
+        valid = false;
+      } else {
+        setMaxDurationError("");
+      }
+    } else {
+      setMaxDurationError("");
+    }
+
+    if (valid) {
+      const principalId = formValues.principal?.value ?? "";
+      const newAccountIds = formValues.accounts.map((o) => o.value ?? "").filter(Boolean);
+      const newOuIds = formValues.ous.map((o) => o.value ?? "").filter(Boolean);
+      const currentId = modalMode === "edit" ? selectedItems[0]?.id : undefined;
+
+      const conflict = policies.find((p) => {
+        if (p.principalId !== principalId) return false;
+        if (currentId && p.id === currentId) return false;
+        const accountOverlap = newAccountIds.some((id) => (p.accountIds ?? []).includes(id));
+        const ouOverlap = newOuIds.some((id) => (p.ouIds ?? []).includes(id));
+        return accountOverlap || ouOverlap;
+      });
+
+      if (conflict) {
+        setFormError(
+          `"${conflict.name}" already grants this principal access to one or more of the selected accounts/OUs. ` +
+            `Edit that policy to add the new permission set instead.`
+        );
+        valid = false;
+      }
+    }
+
     return valid;
   }
 
@@ -250,6 +302,11 @@ export function PrivilegedPoliciesPage() {
         ouIds: formValues.ous.map((o) => o.value ?? ""),
         permissionSetArns: formValues.permissionSets.map((o) => o.value ?? ""),
         permissionSetNames: formValues.permissionSets.map((o) => o.label ?? ""),
+        maxDurationMinutes: (() => {
+          if (!formValues.maxDurationMinutes) return 1439;
+          const [h, m] = formValues.maxDurationMinutes.split(":").map(Number);
+          return h * 60 + m || 1439;
+        })(),
       };
 
       if (modalMode === "create") {
@@ -346,6 +403,17 @@ export function PrivilegedPoliciesPage() {
               header: "Permission Sets",
               cell: (item) =>
                 item.permissionSetNames?.filter(Boolean).join(", ") || "-",
+            },
+            {
+              id: "maxDuration",
+              header: "Max Duration",
+              cell: (item) => {
+                if (!item.maxDurationMinutes) return "No limit";
+                const h = Math.floor(item.maxDurationMinutes / 60);
+                const m = item.maxDurationMinutes % 60;
+                return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+              },
+              width: 120,
             },
           ]}
           items={policies}
@@ -525,6 +593,22 @@ export function PrivilegedPoliciesPage() {
                     filteringType="auto"
                     placeholder="Select permission sets"
                     empty="No permission sets found"
+                  />
+                </FormField>
+
+                <FormField
+                  label="Max Duration"
+                  description="Maximum access duration users can request under this policy (hh:mm). Defaults to 23:59 if left blank. Maximum is 23:59."
+                  errorText={maxDurationError}
+                >
+                  <TimeInput
+                    format="hh:mm"
+                    placeholder="hh:mm"
+                    use24Hour={true}
+                    value={formValues.maxDurationMinutes}
+                    onChange={({ detail }) =>
+                      setFormValues((prev) => ({ ...prev, maxDurationMinutes: detail.value }))
+                    }
                   />
                 </FormField>
               </SpaceBetween>

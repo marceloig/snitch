@@ -10,7 +10,7 @@ import ContentLayout from "@cloudscape-design/components/content-layout";
 import Form from "@cloudscape-design/components/form";
 import FormField from "@cloudscape-design/components/form-field";
 import Header from "@cloudscape-design/components/header";
-import Input from "@cloudscape-design/components/input";
+import TimeInput from "@cloudscape-design/components/time-input";
 import Modal from "@cloudscape-design/components/modal";
 import Select from "@cloudscape-design/components/select";
 import SpaceBetween from "@cloudscape-design/components/space-between";
@@ -210,10 +210,32 @@ export function RequestAccessPage() {
       valid = false;
     }
 
-    const minutes = Number(formValues.durationMinutes);
-    if (!formValues.durationMinutes || !Number.isInteger(minutes) || minutes <= 0) {
-      errors.durationMinutes = "Enter a whole number of minutes greater than 0.";
+    const [hStr, mStr] = formValues.durationMinutes.split(":");
+    const hours = Number(hStr);
+    const mins = Number(mStr);
+    if (
+      !/^\d{2}:\d{2}$/.test(formValues.durationMinutes) ||
+      (hours === 0 && mins === 0)
+    ) {
+      errors.durationMinutes = "Enter a duration greater than 0 (hh:mm).";
       valid = false;
+    } else if (loadState.status === "ready" && formValues.account && formValues.permissionSet) {
+      const permittedEntry = loadState.permitted.find(
+        (p) =>
+          p.accountId === formValues.account!.value &&
+          p.permissionSetArn === formValues.permissionSet!.value
+      );
+      const requestedMinutes = hours * 60 + mins;
+      if (
+        permittedEntry?.maxDurationMinutes != null &&
+        requestedMinutes > permittedEntry.maxDurationMinutes
+      ) {
+        const maxH = Math.floor(permittedEntry.maxDurationMinutes / 60);
+        const maxM = permittedEntry.maxDurationMinutes % 60;
+        const maxLabel = `${String(maxH).padStart(2, "0")}:${String(maxM).padStart(2, "0")}`;
+        errors.durationMinutes = `Duration exceeds the policy limit of ${maxLabel} (hh:mm).`;
+        valid = false;
+      }
     }
 
     setFormErrors(errors);
@@ -240,7 +262,10 @@ export function RequestAccessPage() {
         permissionSetArn: formValues.permissionSet!.value ?? "",
         permissionSetName:
           permittedEntry?.permissionSetName ?? formValues.permissionSet!.label ?? "",
-        durationMinutes: Number(formValues.durationMinutes),
+        durationMinutes: (() => {
+          const [h, m] = formValues.durationMinutes.split(":").map(Number);
+          return h * 60 + m;
+        })(),
       });
 
       if (res.errors?.length) {
@@ -430,21 +455,18 @@ export function RequestAccessPage() {
               </FormField>
 
               <FormField
-                label="Duration (minutes)"
-                description="How long you need access. Must be a whole number."
+                label="Duration"
+                description="How long you need access, in hours and minutes."
                 errorText={formErrors.durationMinutes}
               >
-                <Input
+                <TimeInput
+                  format="hh:mm"
+                  placeholder="hh:mm"
+                  use24Hour={true}
                   value={formValues.durationMinutes}
-                  onChange={({ detail }) => {
-                    // Only allow digits — prevent decimals and negative signs
-                    if (/^\d*$/.test(detail.value)) {
-                      setFormValues((prev) => ({ ...prev, durationMinutes: detail.value }));
-                    }
-                  }}
-                  inputMode="numeric"
-                  type="number"
-                  placeholder="e.g. 60"
+                  onChange={({ detail }) =>
+                    setFormValues((prev) => ({ ...prev, durationMinutes: detail.value }))
+                  }
                 />
               </FormField>
             </SpaceBetween>
