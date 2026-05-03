@@ -1,5 +1,5 @@
 import { useAuthenticator } from "@aws-amplify/ui-react";
-import { Route, Routes, useNavigate, useLocation } from "react-router-dom";
+import { Route, Routes, useNavigate, useLocation } from "react-router";
 
 import AppLayout from "@cloudscape-design/components/app-layout";
 import SideNavigation, { SideNavigationProps } from "@cloudscape-design/components/side-navigation";

@@ -15,7 +15,7 @@ A fullstack application for managing privileged access to AWS accounts. Admins d
 
 ## Technology Stack
 
-- **Frontend**: React 18 + TypeScript, Vite, Cloudscape Design System
+- **Frontend**: React 18 + TypeScript, Vite, Cloudscape Design System, React Router v7
 - **Backend**: AWS Amplify Gen 2 (AppSync GraphQL + DynamoDB + Cognito)
 - **Authorization**: AWS Verified Permissions (Cedar policies, STRICT schema validation)
 - **Testing**: Vitest + React Testing Library (jsdom environment)
@@ -202,6 +202,11 @@ import type { Schema } from "../amplify/data/resource";
 // Cloudscape — import per-component, not from index
 import AppLayout from "@cloudscape-design/components/app-layout";
 import Table from "@cloudscape-design/components/table";
+import Pagination from "@cloudscape-design/components/pagination";
+
+// Routing — package is "react-router" (v7); react-router-dom no longer exists
+import { Route, Routes, useNavigate, useLocation } from "react-router";
+import { HashRouter } from "react-router";
 
 // Amplify auth
 import { useAuthenticator } from "@aws-amplify/ui-react";
@@ -209,6 +214,26 @@ import { useAuthenticator } from "@aws-amplify/ui-react";
 // Src imports use the @/* alias
 import App from "@/App";
 ```
+
+## UI Conventions
+
+### Tables
+
+All Cloudscape `<Table>` components use client-side pagination with **10 items per page** (`PAGE_SIZE = 10`). Every page component that renders a table must:
+
+1. Hold `const [currentPage, setCurrentPage] = useState(1)` and `const PAGE_SIZE = 10`.
+2. Slice the data: `items={rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)}`.
+3. Add the `pagination` prop:
+   ```tsx
+   pagination={
+     <Pagination
+       currentPageIndex={currentPage}
+       pagesCount={Math.max(1, Math.ceil(rows.length / PAGE_SIZE))}
+       onChange={({ detail }) => setCurrentPage(detail.currentPageIndex)}
+     />
+   }
+   ```
+4. Reset to page 1 (`setCurrentPage(1)`) whenever the data array is replaced (after load or mutation).
 
 ## Code Style
 
