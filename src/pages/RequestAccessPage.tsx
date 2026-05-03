@@ -61,7 +61,7 @@ type LoadState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; idcUserId: string; permitted: NonNullable<PermittedAccess>[] };
+  | { status: "ready"; idcUserId: string; idcUserEmail: string; idcUserDisplayName: string; permitted: NonNullable<PermittedAccess>[] };
 
 type FormValues = {
   account: SelectProps.Option | null;
@@ -88,6 +88,10 @@ function requestStatusType(
       return "stopped";
     case "FAILED":
       return "error";
+    case "REJECTED":
+      return "error";
+    case "PENDING_APPROVAL":
+      return "pending";
     default:
       return "pending";
   }
@@ -124,6 +128,9 @@ export function RequestAccessPage() {
       const idcUserId = idcRes.data.id;
       if (!idcUserId) throw new Error("IDC user record is missing an ID");
 
+      const idcUserEmail = idcRes.data.email ?? "";
+      const idcUserDisplayName = idcRes.data.displayName ?? idcRes.data.userName ?? "";
+
       const evalRes = await client.queries.evaluateMyAccess({ idcUserId });
       if (evalRes.errors?.length) {
         throw new Error(evalRes.errors.map((e) => e.message).join("; "));
@@ -133,7 +140,7 @@ export function RequestAccessPage() {
         (p): p is NonNullable<PermittedAccess> => p !== null
       );
 
-      setLoadState({ status: "ready", idcUserId, permitted });
+      setLoadState({ status: "ready", idcUserId, idcUserEmail, idcUserDisplayName, permitted });
     } catch (err) {
       setLoadState({
         status: "error",
@@ -258,6 +265,8 @@ export function RequestAccessPage() {
 
       const res = await client.mutations.requestAccess({
         idcUserId: loadState.idcUserId,
+        idcUserEmail: loadState.idcUserEmail,
+        idcUserDisplayName: loadState.idcUserDisplayName,
         accountId: formValues.account!.value ?? "",
         permissionSetArn: formValues.permissionSet!.value ?? "",
         permissionSetName:
@@ -266,6 +275,7 @@ export function RequestAccessPage() {
           const [h, m] = formValues.durationMinutes.split(":").map(Number);
           return h * 60 + m;
         })(),
+        requiresApproval: permittedEntry?.requiresApproval ?? false,
       });
 
       if (res.errors?.length) {
@@ -453,6 +463,24 @@ export function RequestAccessPage() {
                   empty="No permission sets available for this account"
                 />
               </FormField>
+
+              {(() => {
+                if (!formValues.account || !formValues.permissionSet) return null;
+                const entry =
+                  loadState.status === "ready"
+                    ? loadState.permitted.find(
+                        (p) =>
+                          p.accountId === formValues.account!.value &&
+                          p.permissionSetArn === formValues.permissionSet!.value
+                      )
+                    : null;
+                return entry?.requiresApproval ? (
+                  <Alert type="info" header="Approval required">
+                    This access requires approval from an admin before it is granted.
+                    Your request will enter a pending state until an approver reviews it.
+                  </Alert>
+                ) : null;
+              })()}
 
               <FormField
                 label="Duration"

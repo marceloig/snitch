@@ -13,6 +13,8 @@ import {
   listAWSAccountsFunction,
   listOUsFunction,
   listPermissionSetsFunction,
+  listCognitoUsersFunction,
+  listCognitoGroupsFunction,
 } from "./functions/awsResources/resource";
 import {
   createPrivilegedPolicyFunction,
@@ -26,6 +28,10 @@ import {
   assignPermissionSetFunction,
   removePermissionSetFunction,
   setStatusFailedFunction,
+  storeApprovalTokenFunction,
+  approveRequestFunction,
+  rejectRequestFunction,
+  listPendingApprovalsFunction,
 } from "./functions/accessRequests/resource";
 
 const backend = defineBackend({
@@ -37,6 +43,8 @@ const backend = defineBackend({
   listAWSAccountsFunction,
   listOUsFunction,
   listPermissionSetsFunction,
+  listCognitoUsersFunction,
+  listCognitoGroupsFunction,
   createPrivilegedPolicyFunction,
   updatePrivilegedPolicyFunction,
   deletePrivilegedPolicyFunction,
@@ -46,6 +54,10 @@ const backend = defineBackend({
   assignPermissionSetFunction,
   removePermissionSetFunction,
   setStatusFailedFunction,
+  storeApprovalTokenFunction,
+  approveRequestFunction,
+  rejectRequestFunction,
+  listPendingApprovalsFunction,
 });
 
 // ─── Cognito Admins group ─────────────────────────────────────────────────────
@@ -99,6 +111,23 @@ backend.getMyIDCUserFunction.resources.lambda.addToRolePolicy(
   "AUTH_USER_POOL_ID",
   userPool.userPoolId
 );
+
+const cognitoListPolicy = new PolicyStatement({
+  effect: Effect.ALLOW,
+  actions: ["cognito-idp:ListUsers", "cognito-idp:ListGroups"],
+  resources: [userPool.userPoolArn],
+});
+
+for (const fn of [
+  backend.listCognitoUsersFunction,
+  backend.listCognitoGroupsFunction,
+]) {
+  fn.resources.lambda.addToRolePolicy(cognitoListPolicy);
+  (fn.resources.lambda as LambdaFunction).addEnvironment(
+    "AUTH_USER_POOL_ID",
+    userPool.userPoolId
+  );
+}
 
 // ─── Verified Permissions policy store ───────────────────────────────────────
 
@@ -231,4 +260,60 @@ backend.evaluateAccessFunction.resources.lambda.addToRolePolicy(
 
 // ─── Access Request workflow ──────────────────────────────────────────────────
 
-setupAccessRequestWorkflow(backend);
+const { accessRequestTableArn, accessRequestTableName } = setupAccessRequestWorkflow(backend);
+
+// approveRequest, rejectRequest, listPendingApprovals live in the data stack
+// (resourceGroupName: "data") so AppSync can resolve them without creating a
+// circular dependency. Their grants are set here where both table references
+// are available in the same scope.
+
+const accessRequestApprovalDdbPolicy = new PolicyStatement({
+  effect: Effect.ALLOW,
+  actions: ["dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Scan"],
+  resources: [accessRequestTableArn],
+});
+
+const privilegedPolicyApprovalReadPolicy = new PolicyStatement({
+  effect: Effect.ALLOW,
+  actions: ["dynamodb:Scan", "dynamodb:GetItem"],
+  resources: [privilegedPolicyTable.tableArn],
+});
+
+const sendTaskPolicy = new PolicyStatement({
+  effect: Effect.ALLOW,
+  // SendTask* APIs do not support resource-level restrictions
+  actions: ["states:SendTaskSuccess", "states:SendTaskFailure"],
+  resources: ["*"],
+});
+
+for (const fn of [
+  backend.approveRequestFunction,
+  backend.rejectRequestFunction,
+]) {
+  fn.resources.lambda.addToRolePolicy(accessRequestApprovalDdbPolicy);
+  fn.resources.lambda.addToRolePolicy(privilegedPolicyApprovalReadPolicy);
+  fn.resources.lambda.addToRolePolicy(sendTaskPolicy);
+  (fn.resources.lambda as LambdaFunction).addEnvironment(
+    "ACCESS_REQUEST_TABLE_NAME",
+    accessRequestTableName
+  );
+  (fn.resources.lambda as LambdaFunction).addEnvironment(
+    "PRIVILEGED_POLICY_TABLE_NAME",
+    privilegedPolicyTable.tableName
+  );
+}
+
+backend.listPendingApprovalsFunction.resources.lambda.addToRolePolicy(
+  accessRequestApprovalDdbPolicy
+);
+backend.listPendingApprovalsFunction.resources.lambda.addToRolePolicy(
+  privilegedPolicyApprovalReadPolicy
+);
+(backend.listPendingApprovalsFunction.resources.lambda as LambdaFunction).addEnvironment(
+  "ACCESS_REQUEST_TABLE_NAME",
+  accessRequestTableName
+);
+(backend.listPendingApprovalsFunction.resources.lambda as LambdaFunction).addEnvironment(
+  "PRIVILEGED_POLICY_TABLE_NAME",
+  privilegedPolicyTable.tableName
+);

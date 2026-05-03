@@ -11,10 +11,13 @@ const sfn = new SFNClient({ region: REGION });
 
 type RequestAccessInput = {
   idcUserId: string;
+  idcUserEmail?: string | null;
+  idcUserDisplayName?: string | null;
   accountId: string;
   permissionSetArn: string;
   permissionSetName: string;
   durationMinutes: number;
+  requiresApproval?: boolean | null;
 };
 
 type AppSyncEvent = { arguments: RequestAccessInput };
@@ -22,11 +25,17 @@ type AppSyncEvent = { arguments: RequestAccessInput };
 export type AccessRequest = {
   id: string;
   idcUserId: string;
+  idcUserEmail: string | null;
+  idcUserDisplayName: string | null;
   accountId: string;
   permissionSetArn: string;
   permissionSetName: string;
   durationMinutes: number;
-  status: "PENDING" | "ACTIVE" | "EXPIRED" | "FAILED";
+  requiresApproval: boolean;
+  status: "PENDING" | "PENDING_APPROVAL" | "ACTIVE" | "EXPIRED" | "FAILED" | "REJECTED";
+  taskToken: string | null;
+  approvedBy: string | null;
+  approverComment: string | null;
   stepFunctionExecutionArn: string | null;
   createdAt: string;
   updatedAt: string;
@@ -34,9 +43,9 @@ export type AccessRequest = {
 
 /**
  * AppSync resolver: persists an AccessRequest record and starts the Step
- * Function execution that will assign the permission set, wait, then remove it.
- *
- * Example: mutation { requestAccess(idcUserId: "u1", accountId: "123", ...) { id status } }
+ * Function execution. If the matching PrivilegedPolicy requires approval the
+ * initial status is PENDING_APPROVAL and the state machine will pause at the
+ * WaitForApproval state; otherwise it is PENDING and proceeds immediately.
  */
 export const handler = async (event: AppSyncEvent): Promise<AccessRequest> => {
   const args = event.arguments;
@@ -47,19 +56,28 @@ export const handler = async (event: AppSyncEvent): Promise<AccessRequest> => {
     );
   }
 
+  // requiresApproval is determined by the frontend via evaluateMyAccess and
+  // passed through the mutation. The AVP check already enforces who can request
+  // what; approval is a workflow gate on top of that authorization.
+  const requiresApproval = args.requiresApproval === true;
+
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  // Persist the request as PENDING before starting the execution so the record
-  // always exists even if StartExecution fails.
   const item: AccessRequest = {
     id,
     idcUserId: args.idcUserId,
+    idcUserEmail: args.idcUserEmail ?? null,
+    idcUserDisplayName: args.idcUserDisplayName ?? null,
     accountId: args.accountId,
     permissionSetArn: args.permissionSetArn,
     permissionSetName: args.permissionSetName,
     durationMinutes: args.durationMinutes,
-    status: "PENDING",
+    requiresApproval,
+    status: requiresApproval ? "PENDING_APPROVAL" : "PENDING",
+    taskToken: null,
+    approvedBy: null,
+    approverComment: null,
     stepFunctionExecutionArn: null,
     createdAt: now,
     updatedAt: now,
@@ -67,22 +85,21 @@ export const handler = async (event: AppSyncEvent): Promise<AccessRequest> => {
 
   await dynamo.send(new PutCommand({ TableName: TABLE_NAME, Item: item }));
 
-  // Start the Step Function — passes all fields needed by each state
   const execution = await sfn.send(
     new StartExecutionCommand({
       stateMachineArn: STATE_MACHINE_ARN,
-      name: id, // use request ID as execution name for easy correlation
+      name: id,
       input: JSON.stringify({
         requestId: id,
         idcUserId: args.idcUserId,
         accountId: args.accountId,
         permissionSetArn: args.permissionSetArn,
         durationSeconds: args.durationMinutes * 60,
+        requiresApproval,
       }),
     })
   );
 
-  // Update the record with the execution ARN now that we have it
   const updatedItem: AccessRequest = {
     ...item,
     stepFunctionExecutionArn: execution.executionArn ?? null,
@@ -93,3 +110,4 @@ export const handler = async (event: AppSyncEvent): Promise<AccessRequest> => {
 
   return updatedItem;
 };
+

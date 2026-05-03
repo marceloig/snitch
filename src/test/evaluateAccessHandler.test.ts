@@ -82,7 +82,7 @@ describe("evaluateAccessHandler", () => {
     const result = await handler(makeEvent(IDC_USER_ID));
 
     expect(result).toEqual([
-      { accountId: ACCOUNT_1, permissionSetArn: PS_ARN_1, permissionSetName: "ReadOnly", maxDurationMinutes: null },
+      { accountId: ACCOUNT_1, permissionSetArn: PS_ARN_1, permissionSetName: "ReadOnly", maxDurationMinutes: null, requiresApproval: false },
     ]);
   });
 
@@ -138,12 +138,14 @@ describe("evaluateAccessHandler", () => {
       permissionSetArn: PS_ARN_1,
       permissionSetName: "ReadOnly",
       maxDurationMinutes: null,
+      requiresApproval: false,
     });
     expect(result).toContainEqual({
       accountId: ACCOUNT_2,
       permissionSetArn: PS_ARN_2,
       permissionSetName: "Admin",
       maxDurationMinutes: null,
+      requiresApproval: false,
     });
   });
 

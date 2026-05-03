@@ -26,6 +26,9 @@ type CreateInput = {
   permissionSetArns?: string[] | null;
   permissionSetNames?: string[] | null;
   maxDurationMinutes?: number | null;
+  requiresApproval?: boolean | null;
+  approverUsernames?: string[] | null;
+  approverGroupNames?: string[] | null;
 };
 
 type AppSyncEvent = { arguments: CreateInput };
@@ -80,6 +83,9 @@ export const handler = async (event: AppSyncEvent) => {
     permissionSetArns,
     permissionSetNames: args.permissionSetNames ?? [],
     maxDurationMinutes: args.maxDurationMinutes ?? null,
+    requiresApproval: args.requiresApproval ?? false,
+    approverUsernames: args.approverUsernames ?? [],
+    approverGroupNames: args.approverGroupNames ?? [],
     avpPolicyId,
     createdAt: now,
     updatedAt: now,

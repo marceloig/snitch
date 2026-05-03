@@ -40,3 +40,33 @@ export const setStatusFailedFunction = defineFunction({
   timeoutSeconds: 30,
   resourceGroupName: "AccessRequestWorkflow",
 });
+
+export const storeApprovalTokenFunction = defineFunction({
+  name: "storeApprovalToken",
+  entry: "./storeApprovalTokenHandler.ts",
+  timeoutSeconds: 30,
+  resourceGroupName: "AccessRequestWorkflow",
+});
+
+// Approval functions are in the data stack so AppSync can reference them
+// without creating a circular dependency with AccessRequestWorkflow.
+export const approveRequestFunction = defineFunction({
+  name: "approveRequest",
+  entry: "./approveRequestHandler.ts",
+  timeoutSeconds: 30,
+  resourceGroupName: "data",
+});
+
+export const rejectRequestFunction = defineFunction({
+  name: "rejectRequest",
+  entry: "./rejectRequestHandler.ts",
+  timeoutSeconds: 30,
+  resourceGroupName: "data",
+});
+
+export const listPendingApprovalsFunction = defineFunction({
+  name: "listPendingApprovals",
+  entry: "./listPendingApprovalsHandler.ts",
+  timeoutSeconds: 30,
+  resourceGroupName: "data",
+});

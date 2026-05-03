@@ -6,12 +6,14 @@ import SideNavigation from "@cloudscape-design/components/side-navigation";
 import TopNavigation from "@cloudscape-design/components/top-navigation";
 
 import { AdminGuard } from "./components/AdminGuard";
+import { ApproveRequestsPage } from "./pages/ApproveRequestsPage";
 import { PrivilegedPoliciesPage } from "./pages/PrivilegedPoliciesPage";
 import { RequestAccessPage } from "./pages/RequestAccessPage";
 
 const NAV_ITEMS: React.ComponentProps<typeof SideNavigation>["items"] = [
   { type: "link", text: "Request Access", href: "#/" },
   { type: "divider" },
+  { type: "link", text: "Approve Requests", href: "#/approve-requests" },
   { type: "link", text: "Privileged Policies", href: "#/privileged-policies" },
 ];
 
@@ -61,6 +63,14 @@ function App() {
         content={
           <Routes>
             <Route path="/" element={<RequestAccessPage />} />
+            <Route
+              path="/approve-requests"
+              element={
+                <AdminGuard>
+                  <ApproveRequestsPage />
+                </AdminGuard>
+              }
+            />
             <Route
               path="/privileged-policies"
               element={

@@ -6,6 +6,8 @@ import {
   listAWSAccountsFunction,
   listOUsFunction,
   listPermissionSetsFunction,
+  listCognitoUsersFunction,
+  listCognitoGroupsFunction,
 } from "../functions/awsResources/resource";
 import {
   createPrivilegedPolicyFunction,
@@ -16,6 +18,9 @@ import {
 import {
   requestAccessFunction,
   listAccessRequestsFunction,
+  approveRequestFunction,
+  rejectRequestFunction,
+  listPendingApprovalsFunction,
 } from "../functions/accessRequests/resource";
 
 const schema = a.schema({
@@ -34,6 +39,9 @@ const schema = a.schema({
       permissionSetNames: a.string().array(),
       maxDurationMinutes: a.integer(),
       avpPolicyId: a.string(),
+      requiresApproval: a.boolean(),
+      approverUsernames: a.string().array(),
+      approverGroupNames: a.string().array(),
     })
     .authorization((allow) => [allow.group("Admins")]),
 
@@ -76,6 +84,7 @@ const schema = a.schema({
     permissionSetArn: a.string(),
     permissionSetName: a.string(),
     maxDurationMinutes: a.integer(),
+    requiresApproval: a.boolean(),
   }),
 
   // Represents a persisted access request record returned from the workflow stack.
@@ -84,12 +93,17 @@ const schema = a.schema({
   AccessRequestItem: a.customType({
     id: a.string(),
     idcUserId: a.string(),
+    idcUserEmail: a.string(),
+    idcUserDisplayName: a.string(),
     accountId: a.string(),
     permissionSetArn: a.string(),
     permissionSetName: a.string(),
     durationMinutes: a.integer(),
     status: a.string(),
     stepFunctionExecutionArn: a.string(),
+    requiresApproval: a.boolean(),
+    approvedBy: a.string(),
+    approverComment: a.string(),
     createdAt: a.string(),
     updatedAt: a.string(),
   }),
@@ -149,6 +163,29 @@ const schema = a.schema({
     .handler(a.handler.function(listPermissionSetsFunction))
     .authorization((allow) => [allow.group("Admins")]),
 
+  CognitoUser: a.customType({
+    username: a.string(),
+    email: a.string(),
+    displayName: a.string(),
+  }),
+
+  CognitoGroup: a.customType({
+    groupName: a.string(),
+    description: a.string(),
+  }),
+
+  listCognitoUsers: a
+    .query()
+    .returns(a.ref("CognitoUser").array())
+    .handler(a.handler.function(listCognitoUsersFunction))
+    .authorization((allow) => [allow.group("Admins")]),
+
+  listCognitoGroups: a
+    .query()
+    .returns(a.ref("CognitoGroup").array())
+    .handler(a.handler.function(listCognitoGroupsFunction))
+    .authorization((allow) => [allow.group("Admins")]),
+
   // AVP-backed mutations — named with suffix to avoid clashing with the
   // auto-generated model mutations (createPrivilegedPolicy etc.)
   createPrivilegedPolicyWithAVP: a
@@ -164,6 +201,9 @@ const schema = a.schema({
       permissionSetArns: a.string().array(),
       permissionSetNames: a.string().array(),
       maxDurationMinutes: a.integer(),
+      requiresApproval: a.boolean(),
+      approverUsernames: a.string().array(),
+      approverGroupNames: a.string().array(),
     })
     .returns(a.ref("PrivilegedPolicy"))
     .handler(a.handler.function(createPrivilegedPolicyFunction))
@@ -183,6 +223,9 @@ const schema = a.schema({
       permissionSetArns: a.string().array(),
       permissionSetNames: a.string().array(),
       maxDurationMinutes: a.integer(),
+      requiresApproval: a.boolean(),
+      approverUsernames: a.string().array(),
+      approverGroupNames: a.string().array(),
     })
     .returns(a.ref("PrivilegedPolicy"))
     .handler(a.handler.function(updatePrivilegedPolicyFunction))
@@ -201,14 +244,44 @@ const schema = a.schema({
     .mutation()
     .arguments({
       idcUserId: a.string().required(),
+      idcUserEmail: a.string(),
+      idcUserDisplayName: a.string(),
       accountId: a.string().required(),
       permissionSetArn: a.string().required(),
       permissionSetName: a.string().required(),
       durationMinutes: a.integer().required(),
+      requiresApproval: a.boolean(),
     })
     .returns(a.ref("AccessRequestItem"))
     .handler(a.handler.function(requestAccessFunction))
     .authorization((allow) => [allow.authenticated()]),
+
+  // Returns PENDING_APPROVAL requests the calling admin is configured to approve.
+  listPendingApprovals: a
+    .query()
+    .returns(a.ref("AccessRequestItem").array())
+    .handler(a.handler.function(listPendingApprovalsFunction))
+    .authorization((allow) => [allow.group("Admins")]),
+
+  approveRequest: a
+    .mutation()
+    .arguments({
+      requestId: a.string().required(),
+      approverComment: a.string(),
+    })
+    .returns(a.ref("AccessRequestItem"))
+    .handler(a.handler.function(approveRequestFunction))
+    .authorization((allow) => [allow.group("Admins")]),
+
+  rejectRequest: a
+    .mutation()
+    .arguments({
+      requestId: a.string().required(),
+      approverComment: a.string(),
+    })
+    .returns(a.ref("AccessRequestItem"))
+    .handler(a.handler.function(rejectRequestFunction))
+    .authorization((allow) => [allow.group("Admins")]),
 });
 
 export type Schema = ClientSchema<typeof schema>;

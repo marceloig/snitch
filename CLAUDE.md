@@ -57,10 +57,30 @@ The frontend (`PrivilegedPoliciesPage.tsx → validate()`) performs the same che
 
 ### JIT access workflow (`amplify/accessRequestWorkflow.ts`)
 
-A separate CDK construct (to avoid circular dependencies with the data stack) that owns:
-- A standalone DynamoDB table (`AccessRequestTable`) with a GSI on `idcUserId` for per-user queries
-- A Step Functions state machine: `AssignPermissionSet → WaitForDuration → RemovePermissionSet`, with a `Catch` → `SetStatusFailed` on all states
-- All Lambda handlers in `amplify/functions/accessRequests/` share a common `maxDurationMinutes` enforcement: max 23:59 (1439 minutes), enforced at the policy level and validated in the UI before the `requestAccess` mutation is called
+A separate CDK construct that owns the `AccessRequestTable` (GSI on `idcUserId`) and the Step Functions state machine. The full state machine flow:
+
+```
+CheckApproval → WaitForApproval (waitForTaskToken, 24h heartbeat)
+              ↓ approved              ↓ rejected             ↓ timeout
+        AssignPermissionSet    RejectionHandled (Pass)  SetStatusExpired (DDB SDK)
+              ↓
+        WaitForDuration → RemovePermissionSet
+```
+
+`SetStatusExpired` is a Step Functions DynamoDB SDK integration state (no Lambda) — it only needs `$.requestId` from the execution context and writes `EXPIRED` directly.
+
+`setupAccessRequestWorkflow()` returns `{ accessRequestTableArn, accessRequestTableName }` so `backend.ts` can wire up the approval Lambdas (which live in a different stack) without creating a circular dependency.
+
+### Approval stack separation — why `approveRequest`, `rejectRequest`, `listPendingApprovals` are in the `data` stack
+
+These three AppSync resolvers are defined in `amplify/data/resource.ts` so AppSync can reference their Lambda ARNs. If they were in the `AccessRequestWorkflow` stack, the dependency graph would be circular:
+
+- `data` → `AccessRequestWorkflow` (AppSync references Lambda ARNs) **AND**
+- `AccessRequestWorkflow` → `data` (needs `PrivilegedPolicyTable` ARN for IAM)
+
+The fix: move the three approval functions to `resourceGroupName: "data"`. `AccessRequestWorkflow` no longer references `data`. Their `ACCESS_REQUEST_TABLE_NAME` env var and IAM grants are set in `backend.ts` using the table values returned by `setupAccessRequestWorkflow()`, creating a one-directional dependency (`data` → `AccessRequestWorkflow`) that CloudFormation can resolve.
+
+### `amplify/data/resource.ts` is the GraphQL contract
 
 ### `amplify/data/resource.ts` is the GraphQL contract
 

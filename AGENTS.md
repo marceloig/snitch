@@ -6,9 +6,11 @@ A fullstack application for managing privileged access to AWS accounts. Admins d
 
 **Core features:**
 - User authentication with Amazon Cognito (Admins group gates all access)
-- Privileged policy management (create, read, update, delete)
+- Privileged policy management (create, read, update, delete) with conflict enforcement (one policy per principal + resource)
 - Cedar policy authoring via `buildCedarPolicy` — policies are stored in AVP and evaluated at request time
-- AWS resource discovery: IDC users/groups, AWS accounts, OUs, Permission Sets
+- AWS resource discovery: IDC users/groups, Cognito users/groups, AWS accounts, OUs, Permission Sets
+- JIT access requests with a Step Functions workflow: assign permission set → wait → revoke
+- Optional approval gate on policies: requests pause at `PENDING_APPROVAL` until an admin approves or rejects (or the 24-hour timeout fires)
 - Responsive UI built with Cloudscape Design System
 
 ## Technology Stack
@@ -50,7 +52,9 @@ snitch/
 │   ├── utils/                  # Helper functions
 │   ├── types/                  # Shared TypeScript types
 │   ├── pages/
-│   │   └── PrivilegedPoliciesPage.tsx  # Full CRUD UI for privileged policies
+│   │   ├── PrivilegedPoliciesPage.tsx  # Admin CRUD for privileged policies (with approval config)
+│   │   ├── RequestAccessPage.tsx       # End-user JIT access request form + request history
+│   │   └── ApproveRequestsPage.tsx     # Admin page: review, approve, or reject pending requests
 │   ├── test/
 │   │   └── setup.ts            # Vitest setup (jest-dom matchers)
 │   ├── App.tsx
@@ -59,6 +63,63 @@ snitch/
 ├── vite.config.ts
 └── tsconfig.json
 ```
+
+## Privileged Policy — Approval Configuration
+
+Each `PrivilegedPolicy` can optionally require an admin to approve requests before access is granted. The relevant fields stored on the policy record:
+
+| Field | Type | Purpose |
+|---|---|---|
+| `requiresApproval` | boolean | Enables the approval gate for all requests under this policy |
+| `approverUsernames` | string[] | Cognito usernames of users who can approve/reject |
+| `approverGroupNames` | string[] | Cognito group names whose members can approve/reject |
+
+When `requiresApproval` is `true`:
+1. The `evaluateMyAccess` query returns `requiresApproval: true` for the matching `(accountId, permissionSetArn)` pair.
+2. The Request Access form shows an info alert warning the user that approval is required.
+3. On submission, `requestAccess` creates the record with `status: "PENDING_APPROVAL"` and the Step Function pauses at `WaitForApproval`.
+4. The `Approve Requests` page (admin-only) lists requests pending the current admin's review.
+5. `approveRequest` / `rejectRequest` mutations resume or terminate the Step Function execution.
+
+### Access Request Statuses
+
+| Status | Meaning |
+|---|---|
+| `PENDING` | No approval required; waiting for Step Functions to assign the permission set |
+| `PENDING_APPROVAL` | Waiting for an approver to act; Step Function is paused |
+| `ACTIVE` | Permission set assigned; timer running |
+| `EXPIRED` | Duration elapsed (access revoked) or 24-hour approval timeout fired |
+| `REJECTED` | An approver rejected the request |
+| `FAILED` | Unrecoverable error in the workflow |
+
+### Approval Workflow — Step Functions States
+
+```
+CheckApproval (Choice)
+  requiresApproval = true  →  WaitForApproval (waitForTaskToken, HeartbeatSeconds: 86400)
+  default                  →  AssignPermissionSet
+
+WaitForApproval
+  on SendTaskSuccess        →  AssignPermissionSet → WaitForDuration → RemovePermissionSet
+  on "RequestRejected"      →  RejectionHandled (Pass — DDB already set to REJECTED)
+  on States.HeartbeatTimeout→  SetStatusExpired (DynamoDB SDK integration, no Lambda)
+  on States.ALL             →  SetStatusFailed
+
+AssignPermissionSet → WaitForDuration → RemovePermissionSet
+```
+
+`SetStatusExpired` uses `arn:aws:states:::aws-sdk:dynamodb:updateItem` directly — no Lambda cold start needed since only `$.requestId` from state context is required.
+
+### New Lambda Handlers (`amplify/functions/accessRequests/`)
+
+| Handler | Stack | Purpose |
+|---|---|---|
+| `storeApprovalTokenHandler.ts` | AccessRequestWorkflow | Called by WaitForApproval state; stores task token, sets `PENDING_APPROVAL` |
+| `approveRequestHandler.ts` | data | Validates approver, calls `SendTaskSuccess`, resumes state machine |
+| `rejectRequestHandler.ts` | data | Validates approver, sets `REJECTED` atomically, calls `SendTaskFailure` |
+| `listPendingApprovalsHandler.ts` | data | Returns `PENDING_APPROVAL` requests the calling admin can act on |
+
+`approveRequest`, `rejectRequest`, `listPendingApprovals` are in the `data` stack (`resourceGroupName: "data"`) — see `CLAUDE.md` for why.
 
 ## AWS Verified Permissions Integration
 

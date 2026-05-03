@@ -24,6 +24,7 @@ export type PermittedAccess = {
   permissionSetArn: string;
   permissionSetName: string;
   maxDurationMinutes: number | null;
+  requiresApproval: boolean;
 };
 
 /**
@@ -64,6 +65,7 @@ export const handler = async (event: AppSyncEvent): Promise<PermittedAccess[]> =
     permissionSetArn: string;
     permissionSetName: string;
     maxDurationMinutes: number | null;
+    requiresApproval: boolean;
   };
   const seen = new Map<string, Candidate>();
   const candidates: Candidate[] = [];
@@ -73,6 +75,7 @@ export const handler = async (event: AppSyncEvent): Promise<PermittedAccess[]> =
     const permissionSetArns: string[] = policy.permissionSetArns ?? [];
     const permissionSetNames: string[] = policy.permissionSetNames ?? [];
     const policyMax: number | null = policy.maxDurationMinutes ?? null;
+    const policyRequiresApproval: boolean = policy.requiresApproval ?? false;
 
     for (const accountId of accountIds) {
       for (let i = 0; i < permissionSetArns.length; i++) {
@@ -85,15 +88,20 @@ export const handler = async (event: AppSyncEvent): Promise<PermittedAccess[]> =
             permissionSetArn: arn,
             permissionSetName: permissionSetNames[i] ?? arn,
             maxDurationMinutes: policyMax,
+            requiresApproval: policyRequiresApproval,
           };
           seen.set(key, candidate);
           candidates.push(candidate);
-        } else if (policyMax !== null) {
+        } else {
           // Use the most restrictive (minimum) max duration across policies
-          existing.maxDurationMinutes =
-            existing.maxDurationMinutes === null
-              ? policyMax
-              : Math.min(existing.maxDurationMinutes, policyMax);
+          if (policyMax !== null) {
+            existing.maxDurationMinutes =
+              existing.maxDurationMinutes === null
+                ? policyMax
+                : Math.min(existing.maxDurationMinutes, policyMax);
+          }
+          // If any policy requires approval for this pair, the pair requires approval
+          if (policyRequiresApproval) existing.requiresApproval = true;
         }
       }
     }
