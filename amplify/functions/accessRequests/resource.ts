@@ -70,3 +70,27 @@ export const listPendingApprovalsFunction = defineFunction({
   timeoutSeconds: 30,
   resourceGroupName: "data",
 });
+
+// Called by the WaitForEarlyRevocation Step Functions state (waitForTaskToken).
+// Must be in AccessRequestWorkflow stack so it lands in the same nested stack
+// as the state machine and DynamoDB table.
+export const storeActiveTokenFunction = defineFunction({
+  name: "storeActiveToken",
+  entry: "./storeActiveTokenHandler.ts",
+  timeoutSeconds: 30,
+  resourceGroupName: "AccessRequestWorkflow",
+});
+
+export const listAllAccessRequestsFunction = defineFunction({
+  name: "listAllAccessRequests",
+  entry: "./listAllAccessRequestsHandler.ts",
+  timeoutSeconds: 30,
+  resourceGroupName: "data",
+});
+
+export const revokeAccessFunction = defineFunction({
+  name: "revokeAccess",
+  entry: "./revokeAccessHandler.ts",
+  timeoutSeconds: 30,
+  resourceGroupName: "data",
+});

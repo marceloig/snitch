@@ -9,8 +9,9 @@ A fullstack application for managing privileged access to AWS accounts. Admins d
 - Privileged policy management (create, read, update, delete) with conflict enforcement (one policy per principal + resource)
 - Cedar policy authoring via `buildCedarPolicy` — policies are stored in AVP and evaluated at request time
 - AWS resource discovery: IDC users/groups, Cognito users/groups, AWS accounts, OUs, Permission Sets
-- JIT access requests with a Step Functions workflow: assign permission set → wait → revoke
+- JIT access requests with a Step Functions workflow: assign permission set → interruptible wait → revoke
 - Optional approval gate on policies: requests pause at `PENDING_APPROVAL` until an admin approves or rejects (or the 24-hour timeout fires)
+- Elevated Access page (admin-only): view all requests across all users and revoke any ACTIVE request early
 - Responsive UI built with Cloudscape Design System
 
 ## Technology Stack
@@ -54,7 +55,8 @@ snitch/
 │   ├── pages/
 │   │   ├── PrivilegedPoliciesPage.tsx  # Admin CRUD for privileged policies (with approval config)
 │   │   ├── RequestAccessPage.tsx       # End-user JIT access request form + request history
-│   │   └── ApproveRequestsPage.tsx     # Admin page: review, approve, or reject pending requests
+│   │   ├── ApproveRequestsPage.tsx     # Admin page: review, approve, or reject pending requests
+│   │   └── ElevatedAccessPage.tsx      # Admin page: view all requests, revoke ACTIVE ones early
 │   ├── test/
 │   │   └── setup.ts            # Vitest setup (jest-dom matchers)
 │   ├── App.tsx
@@ -86,9 +88,11 @@ When `requiresApproval` is `true`:
 | Status | Meaning |
 |---|---|
 | `PENDING` | No approval required; waiting for Step Functions to assign the permission set |
-| `PENDING_APPROVAL` | Waiting for an approver to act; Step Function is paused |
-| `ACTIVE` | Permission set assigned; timer running |
-| `EXPIRED` | Duration elapsed (access revoked) or 24-hour approval timeout fired |
+| `PENDING_APPROVAL` | Waiting for an approver to act; Step Function is paused at `WaitForApproval` |
+| `SCHEDULED` | Approved but waiting for a future start time |
+| `ACTIVE` | Permission set assigned; Step Function paused at `WaitForEarlyRevocation` |
+| `EXPIRED` | Duration elapsed naturally (access revoked) or 24-hour approval timeout fired |
+| `REVOKED` | Admin revoked the request early via the Elevated Access page |
 | `REJECTED` | An approver rejected the request |
 | `FAILED` | Unrecoverable error in the workflow |
 
@@ -97,29 +101,48 @@ When `requiresApproval` is `true`:
 ```
 CheckApproval (Choice)
   requiresApproval = true  →  WaitForApproval (waitForTaskToken, HeartbeatSeconds: 86400)
-  default                  →  AssignPermissionSet
+  default                  →  CheckStartTime
 
 WaitForApproval
-  on SendTaskSuccess        →  AssignPermissionSet → WaitForDuration → RemovePermissionSet
+  on SendTaskSuccess        →  CheckStartTime
   on "RequestRejected"      →  RejectionHandled (Pass — DDB already set to REJECTED)
   on States.HeartbeatTimeout→  SetStatusExpired (DynamoDB SDK integration, no Lambda)
   on States.ALL             →  SetStatusFailed
 
-AssignPermissionSet → WaitForDuration → RemovePermissionSet
+CheckStartTime (Choice)
+  startTime present         →  SetStatusScheduled → WaitUntilStartTime → AssignPermissionSet
+  default                   →  AssignPermissionSet
+
+AssignPermissionSet → WaitForEarlyRevocation → RemovePermissionSet
 ```
+
+**`WaitForEarlyRevocation`** replaces the old plain `Wait` state. It uses `waitForTaskToken` with `TimeoutSecondsPath: "$.durationSeconds"` so it can be interrupted:
+
+- `States.Timeout` (natural expiry after `durationSeconds`) → `RemovePermissionSet` with no flag → sets status `EXPIRED`
+- `SendTaskSuccess` from `revokeAccessHandler` → `RemovePermissionSet` with `revokedByAdmin: true` → sets status `REVOKED`
+
+`storeActiveTokenHandler` is invoked when the state starts; it stores the task token in DDB so `revokeAccessHandler` can call `SendTaskSuccess` later.
 
 `SetStatusExpired` uses `arn:aws:states:::aws-sdk:dynamodb:updateItem` directly — no Lambda cold start needed since only `$.requestId` from state context is required.
 
-### New Lambda Handlers (`amplify/functions/accessRequests/`)
+### Lambda Handlers (`amplify/functions/accessRequests/`)
 
 | Handler | Stack | Purpose |
 |---|---|---|
-| `storeApprovalTokenHandler.ts` | AccessRequestWorkflow | Called by WaitForApproval state; stores task token, sets `PENDING_APPROVAL` |
+| `storeApprovalTokenHandler.ts` | AccessRequestWorkflow | Called by `WaitForApproval`; stores task token, sets `PENDING_APPROVAL` |
+| `storeActiveTokenHandler.ts` | AccessRequestWorkflow | Called by `WaitForEarlyRevocation`; stores task token while request is `ACTIVE` |
+| `assignPermissionSetHandler.ts` | AccessRequestWorkflow | Creates SSO account assignment, sets `ACTIVE` |
+| `removePermissionSetHandler.ts` | AccessRequestWorkflow | Deletes SSO account assignment; sets `REVOKED` if `revokedByAdmin: true`, otherwise `EXPIRED` |
+| `setStatusFailedHandler.ts` | AccessRequestWorkflow | Sets `FAILED` on unrecoverable workflow errors |
+| `requestAccessHandler.ts` | AccessRequestWorkflow | Persists the request and starts the state machine |
+| `listAccessRequestsHandler.ts` | AccessRequestWorkflow | Returns all requests for a given IDC user (newest first, via GSI) |
 | `approveRequestHandler.ts` | data | Validates approver, calls `SendTaskSuccess`, resumes state machine |
 | `rejectRequestHandler.ts` | data | Validates approver, sets `REJECTED` atomically, calls `SendTaskFailure` |
 | `listPendingApprovalsHandler.ts` | data | Returns `PENDING_APPROVAL` requests the calling admin can act on |
+| `listAllAccessRequestsHandler.ts` | data | Returns all requests across all users (admin-only, newest first) |
+| `revokeAccessHandler.ts` | data | Signals `WaitForEarlyRevocation` via `SendTaskSuccess` to trigger early removal |
 
-`approveRequest`, `rejectRequest`, `listPendingApprovals` are in the `data` stack (`resourceGroupName: "data"`) — see `CLAUDE.md` for why.
+`approveRequest`, `rejectRequest`, `listPendingApprovals`, `listAllAccessRequests`, `revokeAccess` are in the `data` stack (`resourceGroupName: "data"`) — see `CLAUDE.md` for why.
 
 ## AWS Verified Permissions Integration
 

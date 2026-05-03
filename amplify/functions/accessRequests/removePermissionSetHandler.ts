@@ -19,6 +19,7 @@ type RemoveInput = {
   accountId: string;
   permissionSetArn: string;
   durationSeconds: number;
+  revokedByAdmin?: boolean;
 };
 
 /**
@@ -57,7 +58,7 @@ export const handler = async (input: RemoveInput): Promise<void> => {
       UpdateExpression: "SET #s = :s, updatedAt = :now",
       ExpressionAttributeNames: { "#s": "status" },
       ExpressionAttributeValues: {
-        ":s": "EXPIRED",
+        ":s": input.revokedByAdmin === true ? "REVOKED" : "EXPIRED",
         ":now": new Date().toISOString(),
       },
     })

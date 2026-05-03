@@ -29,9 +29,12 @@ import {
   removePermissionSetFunction,
   setStatusFailedFunction,
   storeApprovalTokenFunction,
+  storeActiveTokenFunction,
   approveRequestFunction,
   rejectRequestFunction,
   listPendingApprovalsFunction,
+  listAllAccessRequestsFunction,
+  revokeAccessFunction,
 } from "./functions/accessRequests/resource";
 
 const backend = defineBackend({
@@ -55,9 +58,12 @@ const backend = defineBackend({
   removePermissionSetFunction,
   setStatusFailedFunction,
   storeApprovalTokenFunction,
+  storeActiveTokenFunction,
   approveRequestFunction,
   rejectRequestFunction,
   listPendingApprovalsFunction,
+  listAllAccessRequestsFunction,
+  revokeAccessFunction,
 });
 
 // ─── Cognito Admins group ─────────────────────────────────────────────────────
@@ -316,4 +322,30 @@ backend.listPendingApprovalsFunction.resources.lambda.addToRolePolicy(
 (backend.listPendingApprovalsFunction.resources.lambda as LambdaFunction).addEnvironment(
   "PRIVILEGED_POLICY_TABLE_NAME",
   privilegedPolicyTable.tableName
+);
+
+backend.listAllAccessRequestsFunction.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    effect: Effect.ALLOW,
+    actions: ["dynamodb:Scan"],
+    resources: [accessRequestTableArn],
+  })
+);
+(backend.listAllAccessRequestsFunction.resources.lambda as LambdaFunction).addEnvironment(
+  "ACCESS_REQUEST_TABLE_NAME",
+  accessRequestTableName
+);
+
+backend.revokeAccessFunction.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    effect: Effect.ALLOW,
+    actions: ["dynamodb:GetItem", "dynamodb:UpdateItem"],
+    resources: [accessRequestTableArn],
+  })
+);
+// SendTaskSuccess does not support resource-level restrictions (same constraint as sendTaskPolicy)
+backend.revokeAccessFunction.resources.lambda.addToRolePolicy(sendTaskPolicy);
+(backend.revokeAccessFunction.resources.lambda as LambdaFunction).addEnvironment(
+  "ACCESS_REQUEST_TABLE_NAME",
+  accessRequestTableName
 );

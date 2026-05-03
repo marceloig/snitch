@@ -21,6 +21,8 @@ import {
   approveRequestFunction,
   rejectRequestFunction,
   listPendingApprovalsFunction,
+  listAllAccessRequestsFunction,
+  revokeAccessFunction,
 } from "../functions/accessRequests/resource";
 
 const schema = a.schema({
@@ -285,6 +287,22 @@ const schema = a.schema({
     })
     .returns(a.ref("AccessRequestItem"))
     .handler(a.handler.function(rejectRequestFunction))
+    .authorization((allow) => [allow.group("Admins")]),
+
+  // Returns every access request across all users, newest first. Admin-only.
+  listAllAccessRequests: a
+    .query()
+    .returns(a.ref("AccessRequestItem").array())
+    .handler(a.handler.function(listAllAccessRequestsFunction))
+    .authorization((allow) => [allow.group("Admins")]),
+
+  // Signals the WaitForEarlyRevocation state to proceed to RemovePermissionSet.
+  // Admin-only. The request must have status ACTIVE.
+  revokeAccess: a
+    .mutation()
+    .arguments({ requestId: a.string().required() })
+    .returns(a.ref("AccessRequestItem"))
+    .handler(a.handler.function(revokeAccessFunction))
     .authorization((allow) => [allow.group("Admins")]),
 });
 

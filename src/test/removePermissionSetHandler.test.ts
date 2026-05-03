@@ -76,7 +76,7 @@ describe("removePermissionSetHandler", () => {
     });
   });
 
-  it("updates DynamoDB status to EXPIRED on success", async () => {
+  it("updates DynamoDB status to EXPIRED on natural expiry", async () => {
     mockSsoSend.mockResolvedValue({
       AccountAssignmentDeletionStatus: { Status: "SUCCEEDED" },
     });
@@ -86,6 +86,28 @@ describe("removePermissionSetHandler", () => {
     expect(mockDynamoSend).toHaveBeenCalledOnce();
     const cmd = mockDynamoSend.mock.calls[0][0];
     expect(cmd.input.Key).toEqual({ id: BASE_INPUT.requestId });
+    expect(cmd.input.ExpressionAttributeValues[":s"]).toBe("EXPIRED");
+  });
+
+  it("updates DynamoDB status to REVOKED when revokedByAdmin is true", async () => {
+    mockSsoSend.mockResolvedValue({
+      AccountAssignmentDeletionStatus: { Status: "SUCCEEDED" },
+    });
+
+    await handler({ ...BASE_INPUT, revokedByAdmin: true });
+
+    const cmd = mockDynamoSend.mock.calls[0][0];
+    expect(cmd.input.ExpressionAttributeValues[":s"]).toBe("REVOKED");
+  });
+
+  it("updates DynamoDB status to EXPIRED when revokedByAdmin is false", async () => {
+    mockSsoSend.mockResolvedValue({
+      AccountAssignmentDeletionStatus: { Status: "SUCCEEDED" },
+    });
+
+    await handler({ ...BASE_INPUT, revokedByAdmin: false });
+
+    const cmd = mockDynamoSend.mock.calls[0][0];
     expect(cmd.input.ExpressionAttributeValues[":s"]).toBe("EXPIRED");
   });
 

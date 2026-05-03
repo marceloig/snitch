@@ -9,6 +9,7 @@ interface AccessRequestResources {
   removePermissionSetFunction: { resources: { lambda: IFunction } };
   setStatusFailedFunction: { resources: { lambda: IFunction } };
   storeApprovalTokenFunction: { resources: { lambda: IFunction } };
+  storeActiveTokenFunction: { resources: { lambda: IFunction } };
   requestAccessFunction: { resources: { lambda: IFunction } };
   listAccessRequestsFunction: { resources: { lambda: IFunction } };
 }
@@ -28,6 +29,7 @@ export function setupAccessRequestWorkflow(
   const removeLambda = backend.removePermissionSetFunction.resources.lambda as LambdaFunction;
   const setFailedLambda = backend.setStatusFailedFunction.resources.lambda as LambdaFunction;
   const storeTokenLambda = backend.storeApprovalTokenFunction.resources.lambda as LambdaFunction;
+  const storeActiveTokenLambda = backend.storeActiveTokenFunction.resources.lambda as LambdaFunction;
   const requestLambda = backend.requestAccessFunction.resources.lambda as LambdaFunction;
   const listLambda = backend.listAccessRequestsFunction.resources.lambda as LambdaFunction;
 
@@ -89,6 +91,8 @@ export function setupAccessRequestWorkflow(
               setFailedLambda.functionArn,
               // WaitForApproval uses waitForTaskToken to invoke storeApprovalToken
               storeTokenLambda.functionArn,
+              // WaitForEarlyRevocation uses waitForTaskToken to invoke storeActiveToken
+              storeActiveTokenLambda.functionArn,
             ],
           }),
         ],
@@ -266,7 +270,7 @@ export function setupAccessRequestWorkflow(
         },
         OutputPath: "$.Payload",
         Retry: transientRetry,
-        Next: "WaitForDuration",
+        Next: "WaitForEarlyRevocation",
         Catch: [
           {
             ErrorEquals: ["States.ALL"],
@@ -276,10 +280,43 @@ export function setupAccessRequestWorkflow(
         ],
       },
 
-      WaitForDuration: {
-        Type: "Wait",
-        SecondsPath: "$.durationSeconds",
+      // Replaces the plain Wait state so admins can signal early revocation.
+      // TimeoutSecondsPath fires States.Timeout after durationSeconds (natural expiry).
+      // SendTaskSuccess from revokeAccessHandler triggers immediate transition (admin revoke).
+      WaitForEarlyRevocation: {
+        Type: "Task",
+        Resource: "arn:aws:states:::lambda:invoke.waitForTaskToken",
+        Parameters: {
+          FunctionName: storeActiveTokenLambda.functionArn,
+          Payload: {
+            "taskToken.$": "$$.Task.Token",
+            "requestId.$": "$.requestId",
+            "idcUserId.$": "$.idcUserId",
+            "accountId.$": "$.accountId",
+            "permissionSetArn.$": "$.permissionSetArn",
+            "durationSeconds.$": "$.durationSeconds",
+          },
+        },
+        // OutputPath: "$" — the SendTaskSuccess output flows directly to RemovePermissionSet
+        OutputPath: "$",
+        // Timeout equals the requested duration; fires States.Timeout on natural expiry
+        TimeoutSecondsPath: "$.durationSeconds",
         Next: "RemovePermissionSet",
+        Catch: [
+          {
+            // Natural expiry: duration elapsed without admin revoke.
+            // ResultPath: null preserves the original input so RemovePermissionSet
+            // receives the payload without revokedByAdmin → sets status EXPIRED.
+            ErrorEquals: ["States.Timeout"],
+            Next: "RemovePermissionSet",
+            ResultPath: null,
+          },
+          {
+            ErrorEquals: ["States.ALL"],
+            Next: "SetStatusFailed",
+            ResultPath: "$.error",
+          },
+        ],
       },
 
       RemovePermissionSet: {
@@ -338,6 +375,15 @@ export function setupAccessRequestWorkflow(
     })
   );
   storeTokenLambda.addEnvironment("ACCESS_REQUEST_TABLE_NAME", accessRequestTable.tableName);
+
+  storeActiveTokenLambda.addToRolePolicy(
+    new PolicyStatement({
+      effect: Effect.ALLOW,
+      actions: ["dynamodb:UpdateItem"],
+      resources: [accessRequestTable.tableArn],
+    })
+  );
+  storeActiveTokenLambda.addEnvironment("ACCESS_REQUEST_TABLE_NAME", accessRequestTable.tableName);
 
   requestLambda.addToRolePolicy(accessRequestDdbPolicy);
   requestLambda.addToRolePolicy(

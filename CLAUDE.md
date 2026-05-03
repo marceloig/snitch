@@ -62,10 +62,18 @@ A separate CDK construct that owns the `AccessRequestTable` (GSI on `idcUserId`)
 ```
 CheckApproval → WaitForApproval (waitForTaskToken, 24h heartbeat)
               ↓ approved              ↓ rejected             ↓ timeout
-        AssignPermissionSet    RejectionHandled (Pass)  SetStatusExpired (DDB SDK)
+        CheckStartTime         RejectionHandled (Pass)  SetStatusExpired (DDB SDK)
+              ↓ (no startTime)
+        AssignPermissionSet
               ↓
-        WaitForDuration → RemovePermissionSet
+        WaitForEarlyRevocation (waitForTaskToken, TimeoutSecondsPath: durationSeconds)
+              ↓ SendTaskSuccess (admin revoke)   ↓ States.Timeout (natural expiry)
+        RemovePermissionSet ← ─────────────────────────────────────────────────────
+              ↓ revokedByAdmin=true → REVOKED
+              ↓ no flag            → EXPIRED
 ```
+
+**`WaitForEarlyRevocation`** is a `waitForTaskToken` Task state (replacing the old plain `Wait`). `storeActiveTokenHandler` stores the task token in DDB when this state is entered. Admins call the `revokeAccess` mutation, which sends `SendTaskSuccess` with `revokedByAdmin: true` in the output — the execution immediately transitions to `RemovePermissionSet`. Natural expiry fires `States.Timeout` after `durationSeconds` via `TimeoutSecondsPath`, which is also caught to `RemovePermissionSet` (without the flag → sets `EXPIRED`).
 
 `SetStatusExpired` is a Step Functions DynamoDB SDK integration state (no Lambda) — it only needs `$.requestId` from the execution context and writes `EXPIRED` directly.
 
@@ -94,14 +102,24 @@ Safe procedure for any GSI rename or sort-key change:
 
 Never combine a GSI deletion and a GSI creation in the same CDK deploy. This applies to the `AccessRequestTable` in `amplify/accessRequestWorkflow.ts` and any other DynamoDB table managed by CDK in this project.
 
-### Approval stack separation — why `approveRequest`, `rejectRequest`, `listPendingApprovals` are in the `data` stack
+### `data` stack vs `AccessRequestWorkflow` stack — which stack for a new handler?
 
-These three AppSync resolvers are defined in `amplify/data/resource.ts` so AppSync can reference their Lambda ARNs. If they were in the `AccessRequestWorkflow` stack, the dependency graph would be circular:
+AppSync resolvers must be in the `data` stack (`resourceGroupName: "data"`) so AppSync can reference their Lambda ARNs. If they were in `AccessRequestWorkflow`, the dependency graph would be circular:
 
 - `data` → `AccessRequestWorkflow` (AppSync references Lambda ARNs) **AND**
 - `AccessRequestWorkflow` → `data` (needs `PrivilegedPolicyTable` ARN for IAM)
 
-The fix: move the three approval functions to `resourceGroupName: "data"`. `AccessRequestWorkflow` no longer references `data`. Their `ACCESS_REQUEST_TABLE_NAME` env var and IAM grants are set in `backend.ts` using the table values returned by `setupAccessRequestWorkflow()`, creating a one-directional dependency (`data` → `AccessRequestWorkflow`) that CloudFormation can resolve.
+**Rule:** Any handler called directly by AppSync (queries/mutations) → `resourceGroupName: "data"`. Any handler called by the Step Functions state machine → `resourceGroupName: "AccessRequestWorkflow"`.
+
+Current split:
+
+| `data` stack | `AccessRequestWorkflow` stack |
+|---|---|
+| `approveRequest`, `rejectRequest`, `listPendingApprovals` | `storeApprovalToken`, `storeActiveToken` |
+| `listAllAccessRequests`, `revokeAccess` | `assignPermissionSet`, `removePermissionSet`, `setStatusFailed` |
+| `requestAccess`, `listAccessRequests` | |
+
+IAM grants and env vars for `data`-stack functions are set in `backend.ts` using the table values returned by `setupAccessRequestWorkflow()`, creating a one-directional dependency (`data` → `AccessRequestWorkflow`) that CloudFormation can resolve.
 
 ### `amplify/data/resource.ts` is the GraphQL contract
 

@@ -13,6 +13,7 @@ import FormField from "@cloudscape-design/components/form-field";
 import Header from "@cloudscape-design/components/header";
 import Input from "@cloudscape-design/components/input";
 import Modal from "@cloudscape-design/components/modal";
+import DatePicker from "@cloudscape-design/components/date-picker";
 import TimeInput from "@cloudscape-design/components/time-input";
 import Toggle from "@cloudscape-design/components/toggle";
 import Multiselect from "@cloudscape-design/components/multiselect";
@@ -32,6 +33,47 @@ const PRINCIPAL_TYPE_OPTIONS: Option[] = [
   { label: "Group", value: "GROUP" },
 ];
 
+function todayDateStr(): string {
+  const now = new Date();
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("/");
+}
+
+function minutesToMaxDuration(minutes: number): { date: string; time: string } {
+  const days = Math.floor(minutes / 1440);
+  const remaining = minutes % 1440;
+  const h = Math.floor(remaining / 60);
+  const m = remaining % 60;
+  const base = new Date();
+  base.setHours(0, 0, 0, 0);
+  const target = new Date(base.getTime() + days * 86400000);
+  return {
+    date: [
+      target.getFullYear(),
+      String(target.getMonth() + 1).padStart(2, "0"),
+      String(target.getDate()).padStart(2, "0"),
+    ].join("/"),
+    time: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
+  };
+}
+
+function maxDurationToMinutes(date: string, time: string): number {
+  if (!date && !time) return 1439;
+  const effectiveDate = date || todayDateStr();
+  const effectiveTime = time || "23:59";
+  const [year, month, day] = effectiveDate.split("/").map(Number);
+  const selected = new Date(year, month - 1, day);
+  const base = new Date();
+  base.setHours(0, 0, 0, 0);
+  const days = Math.max(0, Math.round((selected.getTime() - base.getTime()) / 86400000));
+  const [h, m] = effectiveTime.split(":").map(Number);
+  const total = days * 1440 + h * 60 + m;
+  return total > 0 ? total : 1439;
+}
+
 type FormValues = {
   name: string;
   description: string;
@@ -40,7 +82,8 @@ type FormValues = {
   accounts: readonly Option[];
   ous: readonly Option[];
   permissionSets: readonly Option[];
-  maxDurationMinutes: string;
+  maxDurationDate: string;
+  maxDurationTime: string;
   requiresApproval: boolean;
   approverUsers: readonly Option[];
   approverGroups: readonly Option[];
@@ -54,7 +97,8 @@ const EMPTY_FORM: FormValues = {
   accounts: [],
   ous: [],
   permissionSets: [],
-  maxDurationMinutes: "23:59",
+  maxDurationDate: "",
+  maxDurationTime: "23:59",
   requiresApproval: false,
   approverUsers: [],
   approverGroups: [],
@@ -220,7 +264,7 @@ export function PrivilegedPoliciesPage() {
   }
 
   function openCreateModal() {
-    setFormValues(EMPTY_FORM);
+    setFormValues({ ...EMPTY_FORM, maxDurationDate: todayDateStr() });
     clearFormErrors();
     setModalMode("create");
     loadAWSResources();
@@ -250,11 +294,12 @@ export function PrivilegedPoliciesPage() {
         label: policy.permissionSetNames?.[i] ?? arn ?? "",
         value: arn ?? "",
       })),
-      maxDurationMinutes: policy.maxDurationMinutes
-        ? String(Math.floor(policy.maxDurationMinutes / 60)).padStart(2, "0") +
-          ":" +
-          String(policy.maxDurationMinutes % 60).padStart(2, "0")
-        : "23:59",
+      ...(() => {
+        const { date, time } = policy.maxDurationMinutes
+          ? minutesToMaxDuration(policy.maxDurationMinutes)
+          : { date: todayDateStr(), time: "23:59" };
+        return { maxDurationDate: date, maxDurationTime: time };
+      })(),
       requiresApproval: policy.requiresApproval ?? false,
       approverUsers: (policy.approverUsernames ?? []).map((u) => ({ label: u ?? "", value: u ?? "" })),
       approverGroups: (policy.approverGroupNames ?? []).map((g) => ({ label: g ?? "", value: g ?? "" })),
@@ -286,17 +331,26 @@ export function PrivilegedPoliciesPage() {
     } else {
       setPermissionSetError("");
     }
-    if (
-      formValues.maxDurationMinutes !== "" &&
-      !/^\d{2}:\d{2}$/.test(formValues.maxDurationMinutes)
-    ) {
-      setMaxDurationError("Enter a valid duration (hh:mm).");
+    if (formValues.maxDurationTime && !/^\d{2}:\d{2}$/.test(formValues.maxDurationTime)) {
+      setMaxDurationError("Enter a valid time (hh:mm, 24-hour format).");
       valid = false;
-    } else if (formValues.maxDurationMinutes) {
-      const [h, m] = formValues.maxDurationMinutes.split(":").map(Number);
-      if (h * 60 + m > 1439) {
-        setMaxDurationError("Maximum duration is 23:59.");
+    } else if (formValues.maxDurationTime) {
+      const [h, m] = formValues.maxDurationTime.split(":").map(Number);
+      if (h > 23 || m > 59) {
+        setMaxDurationError("Enter a valid time (hh:mm, 24-hour format).");
         valid = false;
+      } else if (formValues.maxDurationDate) {
+        const [year, month, day] = formValues.maxDurationDate.split("/").map(Number);
+        const selected = new Date(year, month - 1, day);
+        const base = new Date();
+        base.setHours(0, 0, 0, 0);
+        const days = Math.round((selected.getTime() - base.getTime()) / 86400000);
+        if (days > 365) {
+          setMaxDurationError("Maximum duration is 1 year from today.");
+          valid = false;
+        } else {
+          setMaxDurationError("");
+        }
       } else {
         setMaxDurationError("");
       }
@@ -345,11 +399,10 @@ export function PrivilegedPoliciesPage() {
         ouIds: formValues.ous.map((o) => o.value ?? ""),
         permissionSetArns: formValues.permissionSets.map((o) => o.value ?? ""),
         permissionSetNames: formValues.permissionSets.map((o) => o.label ?? ""),
-        maxDurationMinutes: (() => {
-          if (!formValues.maxDurationMinutes) return 1439;
-          const [h, m] = formValues.maxDurationMinutes.split(":").map(Number);
-          return h * 60 + m || 1439;
-        })(),
+        maxDurationMinutes: maxDurationToMinutes(
+          formValues.maxDurationDate,
+          formValues.maxDurationTime
+        ),
         requiresApproval: formValues.requiresApproval,
         approverUsernames: formValues.requiresApproval
           ? formValues.approverUsers.map((o) => o.value ?? "")
@@ -661,18 +714,34 @@ export function PrivilegedPoliciesPage() {
 
                 <FormField
                   label="Max Duration"
-                  description="Maximum access duration users can request under this policy (hh:mm). Defaults to 23:59 if left blank. Maximum is 23:59."
+                  description="Date and time that defines the maximum access duration. The duration is calculated from today to the selected date and time (up to 1 year). Defaults to end of today if left blank."
                   errorText={maxDurationError}
                 >
-                  <TimeInput
-                    format="hh:mm"
-                    placeholder="hh:mm"
-                    use24Hour={true}
-                    value={formValues.maxDurationMinutes}
-                    onChange={({ detail }) =>
-                      setFormValues((prev) => ({ ...prev, maxDurationMinutes: detail.value }))
-                    }
-                  />
+                  <SpaceBetween direction="horizontal" size="xs">
+                    <DatePicker
+                      value={formValues.maxDurationDate}
+                      onChange={({ detail }) =>
+                        setFormValues((prev) => ({ ...prev, maxDurationDate: detail.value }))
+                      }
+                      placeholder="YYYY/MM/DD"
+                      isDateEnabled={(date) => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const maxDate = new Date(today.getTime() + 365 * 86400000);
+                        return date >= today && date <= maxDate;
+                      }}
+                    />
+                    <TimeInput
+                      format="hh:mm"
+                      placeholder="hh:mm"
+                      use24Hour={true}
+                      value={formValues.maxDurationTime}
+                      onChange={({ detail }) =>
+                        setFormValues((prev) => ({ ...prev, maxDurationTime: detail.value }))
+                      }
+                      disabled={!formValues.maxDurationDate}
+                    />
+                  </SpaceBetween>
                 </FormField>
 
                 <FormField

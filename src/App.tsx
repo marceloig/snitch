@@ -7,6 +7,7 @@ import TopNavigation from "@cloudscape-design/components/top-navigation";
 
 import { AdminGuard } from "./components/AdminGuard";
 import { ApproveRequestsPage } from "./pages/ApproveRequestsPage";
+import { ElevatedAccessPage } from "./pages/ElevatedAccessPage";
 import { PrivilegedPoliciesPage } from "./pages/PrivilegedPoliciesPage";
 import { RequestAccessPage } from "./pages/RequestAccessPage";
 
@@ -19,6 +20,7 @@ const NAV_ITEMS: SideNavigationProps.Item[] = [
     items: [
       { type: "link", text: "Approve Requests", href: "#/approve-requests" },
       { type: "link", text: "Privileged Policies", href: "#/privileged-policies" },
+      { type: "link", text: "Elevated Access", href: "#/elevated-access" },
     ],
   },
 ];
@@ -81,6 +83,14 @@ function App() {
               element={
                 <AdminGuard>
                   <PrivilegedPoliciesPage />
+                </AdminGuard>
+              }
+            />
+            <Route
+              path="/elevated-access"
+              element={
+                <AdminGuard>
+                  <ElevatedAccessPage />
                 </AdminGuard>
               }
             />
