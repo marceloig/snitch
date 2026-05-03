@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
+import { formatDuration } from "@/utils/duration";
 
 import Alert from "@cloudscape-design/components/alert";
 import Box from "@cloudscape-design/components/box";
@@ -179,8 +180,8 @@ export function ApproveRequestsPage() {
               },
               {
                 id: "durationMinutes",
-                header: "Duration (min)",
-                cell: (item) => item.durationMinutes,
+                header: "Duration",
+                cell: (item) => formatDuration(item.durationMinutes),
                 width: 130,
               },
               {
@@ -288,7 +289,7 @@ export function ApproveRequestsPage() {
                 <br />
                 <strong>Permission Set:</strong> {selected.permissionSetName}
                 <br />
-                <strong>Duration:</strong> {selected.durationMinutes} minutes
+                <strong>Duration:</strong> {formatDuration(selected.durationMinutes)}
                 <br />
                 <strong>Requested at:</strong> {selected.createdAt}
                 <br />

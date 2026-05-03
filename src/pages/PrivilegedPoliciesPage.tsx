@@ -33,46 +33,12 @@ const PRINCIPAL_TYPE_OPTIONS: Option[] = [
   { label: "Group", value: "GROUP" },
 ];
 
-function todayDateStr(): string {
-  const now = new Date();
-  return [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, "0"),
-    String(now.getDate()).padStart(2, "0"),
-  ].join("/");
-}
-
-function minutesToMaxDuration(minutes: number): { date: string; time: string } {
-  const days = Math.floor(minutes / 1440);
-  const remaining = minutes % 1440;
-  const h = Math.floor(remaining / 60);
-  const m = remaining % 60;
-  const base = new Date();
-  base.setHours(0, 0, 0, 0);
-  const target = new Date(base.getTime() + days * 86400000);
-  return {
-    date: [
-      target.getFullYear(),
-      String(target.getMonth() + 1).padStart(2, "0"),
-      String(target.getDate()).padStart(2, "0"),
-    ].join("/"),
-    time: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
-  };
-}
-
-function maxDurationToMinutes(date: string, time: string): number {
-  if (!date && !time) return 1439;
-  const effectiveDate = date || todayDateStr();
-  const effectiveTime = time || "23:59";
-  const [year, month, day] = effectiveDate.split("/").map(Number);
-  const selected = new Date(year, month - 1, day);
-  const base = new Date();
-  base.setHours(0, 0, 0, 0);
-  const days = Math.max(0, Math.round((selected.getTime() - base.getTime()) / 86400000));
-  const [h, m] = effectiveTime.split(":").map(Number);
-  const total = days * 1440 + h * 60 + m;
-  return total > 0 ? total : 1439;
-}
+import {
+  todayDateStr,
+  minutesToMaxDuration,
+  maxDurationToMinutes,
+  formatDuration,
+} from "@/utils/duration";
 
 type FormValues = {
   name: string;
@@ -340,7 +306,7 @@ export function PrivilegedPoliciesPage() {
         setMaxDurationError("Enter a valid time (hh:mm, 24-hour format).");
         valid = false;
       } else if (formValues.maxDurationDate) {
-        const [year, month, day] = formValues.maxDurationDate.split("/").map(Number);
+        const [year, month, day] = formValues.maxDurationDate.split("-").map(Number);
         const selected = new Date(year, month - 1, day);
         const base = new Date();
         base.setHours(0, 0, 0, 0);
@@ -510,12 +476,8 @@ export function PrivilegedPoliciesPage() {
             {
               id: "maxDuration",
               header: "Max Duration",
-              cell: (item) => {
-                if (!item.maxDurationMinutes) return "No limit";
-                const h = Math.floor(item.maxDurationMinutes / 60);
-                const m = item.maxDurationMinutes % 60;
-                return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-              },
+              cell: (item) =>
+                item.maxDurationMinutes ? formatDuration(item.maxDurationMinutes) : "No limit",
               width: 120,
             },
             {
