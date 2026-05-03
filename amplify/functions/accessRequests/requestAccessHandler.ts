@@ -18,6 +18,7 @@ type RequestAccessInput = {
   permissionSetName: string;
   durationMinutes: number;
   requiresApproval?: boolean | null;
+  justification: string;
 };
 
 type AppSyncEvent = { arguments: RequestAccessInput };
@@ -32,6 +33,7 @@ export type AccessRequest = {
   permissionSetName: string;
   durationMinutes: number;
   requiresApproval: boolean;
+  justification: string;
   status: "PENDING" | "PENDING_APPROVAL" | "ACTIVE" | "EXPIRED" | "FAILED" | "REJECTED";
   taskToken: string | null;
   approvedBy: string | null;
@@ -74,6 +76,7 @@ export const handler = async (event: AppSyncEvent): Promise<AccessRequest> => {
     permissionSetName: args.permissionSetName,
     durationMinutes: args.durationMinutes,
     requiresApproval,
+    justification: args.justification,
     status: requiresApproval ? "PENDING_APPROVAL" : "PENDING",
     taskToken: null,
     approvedBy: null,

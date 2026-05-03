@@ -23,6 +23,7 @@ export type AccessRequestRecord = {
   permissionSetName: string;
   durationMinutes: number;
   status: string;
+  justification: string | null;
   stepFunctionExecutionArn: string | null;
   createdAt: string;
   updatedAt: string;
@@ -42,7 +43,7 @@ export const handler = async (
   const result = await dynamo.send(
     new QueryCommand({
       TableName: TABLE_NAME,
-      IndexName: "byIdcUserId",
+      IndexName: "byIdcUserIdCreatedAt",
       KeyConditionExpression: "idcUserId = :uid",
       ExpressionAttributeValues: { ":uid": idcUserId },
       ScanIndexForward: false, // newest first

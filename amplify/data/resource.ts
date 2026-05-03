@@ -102,6 +102,7 @@ const schema = a.schema({
     status: a.string(),
     stepFunctionExecutionArn: a.string(),
     requiresApproval: a.boolean(),
+    justification: a.string(),
     approvedBy: a.string(),
     approverComment: a.string(),
     createdAt: a.string(),
@@ -251,6 +252,7 @@ const schema = a.schema({
       permissionSetName: a.string().required(),
       durationMinutes: a.integer().required(),
       requiresApproval: a.boolean(),
+      justification: a.string().required(),
     })
     .returns(a.ref("AccessRequestItem"))
     .handler(a.handler.function(requestAccessFunction))

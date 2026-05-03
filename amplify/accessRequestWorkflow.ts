@@ -40,8 +40,9 @@ export function setupAccessRequestWorkflow(
   });
 
   accessRequestTable.addGlobalSecondaryIndex({
-    indexName: "byIdcUserId",
+    indexName: "byIdcUserIdCreatedAt",
     partitionKey: { name: "idcUserId", type: AttributeType.STRING },
+    sortKey: { name: "createdAt", type: AttributeType.STRING },
   });
 
   // ─── IAM policies ──────────────────────────────────────────────────────────

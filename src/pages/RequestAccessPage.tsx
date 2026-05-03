@@ -10,6 +10,7 @@ import ContentLayout from "@cloudscape-design/components/content-layout";
 import Form from "@cloudscape-design/components/form";
 import FormField from "@cloudscape-design/components/form-field";
 import Header from "@cloudscape-design/components/header";
+import Textarea from "@cloudscape-design/components/textarea";
 import TimeInput from "@cloudscape-design/components/time-input";
 import Modal from "@cloudscape-design/components/modal";
 import Select from "@cloudscape-design/components/select";
@@ -68,16 +69,18 @@ type FormValues = {
   account: SelectProps.Option | null;
   permissionSet: SelectProps.Option | null;
   durationMinutes: string;
+  justification: string;
 };
 
 type FormErrors = {
   account: string;
   permissionSet: string;
   durationMinutes: string;
+  justification: string;
 };
 
-const EMPTY_FORM: FormValues = { account: null, permissionSet: null, durationMinutes: "" };
-const EMPTY_ERRORS: FormErrors = { account: "", permissionSet: "", durationMinutes: "" };
+const EMPTY_FORM: FormValues = { account: null, permissionSet: null, durationMinutes: "", justification: "" };
+const EMPTY_ERRORS: FormErrors = { account: "", permissionSet: "", durationMinutes: "", justification: "" };
 
 function requestStatusType(
   status: string | null | undefined
@@ -150,7 +153,10 @@ export function RequestAccessPage() {
 
       setLoadState({ status: "ready", idcUserId, idcUserEmail, idcUserDisplayName, permitted });
       setRequests(
-        (requestsRes.data ?? []).filter((r): r is NonNullable<typeof r> => r !== null).map(toRow)
+        (requestsRes.data ?? [])
+          .filter((r): r is NonNullable<typeof r> => r !== null)
+          .map(toRow)
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       );
       setCurrentPage(1);
     } catch (err) {
@@ -171,7 +177,10 @@ export function RequestAccessPage() {
         idcUserId: loadState.idcUserId,
       });
       setRequests(
-        (res.data ?? []).filter((r): r is NonNullable<typeof r> => r !== null).map(toRow)
+        (res.data ?? [])
+          .filter((r): r is NonNullable<typeof r> => r !== null)
+          .map(toRow)
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       );
       setCurrentPage(1);
     } finally {
@@ -213,7 +222,7 @@ export function RequestAccessPage() {
   }
 
   function validate(): boolean {
-    const errors: FormErrors = { account: "", permissionSet: "", durationMinutes: "" };
+    const errors: FormErrors = { account: "", permissionSet: "", durationMinutes: "", justification: "" };
     let valid = true;
 
     if (!formValues.account) {
@@ -253,6 +262,11 @@ export function RequestAccessPage() {
       }
     }
 
+    if (!formValues.justification.trim()) {
+      errors.justification = "Explain why you need this access.";
+      valid = false;
+    }
+
     setFormErrors(errors);
     return valid;
   }
@@ -284,6 +298,7 @@ export function RequestAccessPage() {
           return h * 60 + m;
         })(),
         requiresApproval: permittedEntry?.requiresApproval ?? false,
+        justification: formValues.justification.trim(),
       });
 
       if (res.errors?.length) {
@@ -447,6 +462,7 @@ export function RequestAccessPage() {
                       // Reset permission set when account changes
                       permissionSet: null,
                       durationMinutes: formValues.durationMinutes,
+                      justification: formValues.justification,
                     })
                   }
                   options={accountOptions()}
@@ -510,6 +526,21 @@ export function RequestAccessPage() {
                   onChange={({ detail }) =>
                     setFormValues((prev) => ({ ...prev, durationMinutes: detail.value }))
                   }
+                />
+              </FormField>
+
+              <FormField
+                label="Justification"
+                description="Explain why you need access to this account."
+                errorText={formErrors.justification}
+              >
+                <Textarea
+                  value={formValues.justification}
+                  onChange={({ detail }) =>
+                    setFormValues((prev) => ({ ...prev, justification: detail.value }))
+                  }
+                  placeholder="Describe the business reason for this access request."
+                  rows={3}
                 />
               </FormField>
             </SpaceBetween>

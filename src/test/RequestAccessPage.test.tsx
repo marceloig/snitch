@@ -3,12 +3,14 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // vi.hoisted ensures mock functions exist before vi.mock factories execute
-const { mockGetMyIDCUser, mockEvaluateMyAccess, mockListMyAccessRequests } = vi.hoisted(() => ({
-  mockGetMyIDCUser: vi.fn(),
-  mockEvaluateMyAccess: vi.fn(),
-  // Default: returns an empty list so the requests table renders without errors
-  mockListMyAccessRequests: vi.fn().mockResolvedValue({ data: [], errors: undefined }),
-}));
+const { mockGetMyIDCUser, mockEvaluateMyAccess, mockListMyAccessRequests, mockRequestAccess } =
+  vi.hoisted(() => ({
+    mockGetMyIDCUser: vi.fn(),
+    mockEvaluateMyAccess: vi.fn(),
+    // Default: returns an empty list so the requests table renders without errors
+    mockListMyAccessRequests: vi.fn().mockResolvedValue({ data: [], errors: undefined }),
+    mockRequestAccess: vi.fn().mockResolvedValue({ data: { id: "req-1" }, errors: undefined }),
+  }));
 
 vi.mock("aws-amplify/data", () => ({
   generateClient: () => ({
@@ -17,7 +19,9 @@ vi.mock("aws-amplify/data", () => ({
       evaluateMyAccess: mockEvaluateMyAccess,
       listMyAccessRequests: mockListMyAccessRequests,
     },
-    mutations: {},
+    mutations: {
+      requestAccess: mockRequestAccess,
+    },
   }),
 }));
 
@@ -53,8 +57,9 @@ function successfulLoad(permitted = [ACCOUNT_1]) {
 describe("RequestAccessPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Restore the default resolved value after clearAllMocks resets it
+    // Restore the default resolved values after clearAllMocks resets them
     mockListMyAccessRequests.mockResolvedValue({ data: [], errors: undefined });
+    mockRequestAccess.mockResolvedValue({ data: { id: "req-1" }, errors: undefined });
   });
 
   describe("loading state", () => {
@@ -162,12 +167,20 @@ describe("RequestAccessPage", () => {
       await userEvent.click(screen.getByRole("button", { name: /new request/i }));
     }
 
-    it("renders the Account, Permission Set, and Duration fields", async () => {
+    it("renders the Account, Permission Set, Duration, and Justification fields", async () => {
       await openModal();
       expect(screen.getByText("AWS Account")).toBeInTheDocument();
       // Use getAllByText because the table column header also says "Permission Set"
       expect(screen.getAllByText("Permission Set").length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText("Duration")).toBeInTheDocument();
+      expect(screen.getByText("Justification")).toBeInTheDocument();
+    });
+
+    it("renders the justification textarea with placeholder text", async () => {
+      await openModal();
+      expect(
+        screen.getByPlaceholderText(/describe the business reason/i)
+      ).toBeInTheDocument();
     });
 
     it("shows validation errors when submitting an empty form", async () => {
@@ -178,6 +191,30 @@ describe("RequestAccessPage", () => {
       expect(
         screen.getByText(/enter a duration greater than 0/i)
       ).toBeInTheDocument();
+      expect(
+        screen.getByText(/explain why you need this access/i)
+      ).toBeInTheDocument();
+    });
+
+    it("shows a justification validation error when only that field is empty", async () => {
+      await openModal([ACCOUNT_1]);
+
+      // Fill the justification textarea — leave other fields empty to focus on justification error
+      const textarea = screen.getByPlaceholderText(/describe the business reason/i);
+      await userEvent.clear(textarea);
+
+      await userEvent.click(screen.getByRole("button", { name: /submit request/i }));
+
+      expect(
+        screen.getByText(/explain why you need this access/i)
+      ).toBeInTheDocument();
+    });
+
+    it("accepts text input in the justification textarea", async () => {
+      await openModal([ACCOUNT_1]);
+      const textarea = screen.getByPlaceholderText(/describe the business reason/i);
+      await userEvent.type(textarea, "Investigating a production incident.");
+      expect(textarea).toHaveValue("Investigating a production incident.");
     });
 
     it("keeps the modal open after a failed validation", async () => {
@@ -220,6 +257,28 @@ describe("RequestAccessPage", () => {
       await userEvent.click(screen.getByRole("button", { name: /new request/i }));
 
       expect(screen.queryByText("Select an account.")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/explain why you need this access/i)
+      ).not.toBeInTheDocument();
+    });
+
+    it("clears the justification textarea when the modal is reopened", async () => {
+      successfulLoad([ACCOUNT_1]);
+      render(<RequestAccessPage />);
+      await waitFor(() => screen.getByRole("button", { name: /new request/i }));
+
+      // Open → type justification → cancel → reopen → field is empty
+      await userEvent.click(screen.getByRole("button", { name: /new request/i }));
+      const textarea = screen.getByPlaceholderText(/describe the business reason/i);
+      await userEvent.type(textarea, "Some justification");
+
+      const dialog = screen.getByRole("dialog", { name: /new access request/i });
+      await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      await userEvent.click(screen.getByRole("button", { name: /new request/i }));
+
+      expect(
+        screen.getByPlaceholderText(/describe the business reason/i)
+      ).toHaveValue("");
     });
   });
 });

@@ -30,6 +30,7 @@ type RequestRow = {
   permissionSetName: string;
   permissionSetArn: string;
   durationMinutes: number;
+  justification: string;
   createdAt: string;
 };
 
@@ -43,6 +44,7 @@ function toRow(item: NonNullable<PendingRequest>): RequestRow {
     permissionSetName: item.permissionSetName ?? "",
     permissionSetArn: item.permissionSetArn ?? "",
     durationMinutes: item.durationMinutes ?? 0,
+    justification: item.justification ?? "",
     createdAt: item.createdAt ?? "",
   };
 }
@@ -282,6 +284,8 @@ export function ApproveRequestsPage() {
                 <strong>Duration:</strong> {selected.durationMinutes} minutes
                 <br />
                 <strong>Requested at:</strong> {selected.createdAt}
+                <br />
+                <strong>Justification:</strong> {selected.justification || "—"}
               </p>
             </TextContent>
           )}
