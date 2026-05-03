@@ -17,6 +17,7 @@ import SpaceBetween from "@cloudscape-design/components/space-between";
 import Spinner from "@cloudscape-design/components/spinner";
 import StatusIndicator from "@cloudscape-design/components/status-indicator";
 import Table from "@cloudscape-design/components/table";
+import Pagination from "@cloudscape-design/components/pagination";
 
 const client = generateClient<Schema>();
 
@@ -101,6 +102,8 @@ export function RequestAccessPage() {
   const [requests, setRequests] = useState<AccessRequestRow[]>([]);
   const [selectedItems, setSelectedItems] = useState<AccessRequestRow[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [modalOpen, setModalOpen] = useState(false);
@@ -109,10 +112,11 @@ export function RequestAccessPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
-  // Step 1: resolve the logged-in user's Cognito email, then find their IDC
-  // identity and evaluate what they're permitted to access via AVP.
-  const loadPermittedAccess = useCallback(async () => {
+  // Resolves the IDC user then fetches evaluateMyAccess and listMyAccessRequests in parallel
+  // so the button and table become ready at the same time.
+  const loadAll = useCallback(async () => {
     setLoadState({ status: "loading" });
+    setRequestsLoading(true);
     try {
       const idcRes = await client.queries.getMyIDCUser();
       if (idcRes.errors?.length) {
@@ -131,7 +135,11 @@ export function RequestAccessPage() {
       const idcUserEmail = idcRes.data.email ?? "";
       const idcUserDisplayName = idcRes.data.displayName ?? idcRes.data.userName ?? "";
 
-      const evalRes = await client.queries.evaluateMyAccess({ idcUserId });
+      const [evalRes, requestsRes] = await Promise.all([
+        client.queries.evaluateMyAccess({ idcUserId }),
+        client.queries.listMyAccessRequests({ idcUserId }),
+      ]);
+
       if (evalRes.errors?.length) {
         throw new Error(evalRes.errors.map((e) => e.message).join("; "));
       }
@@ -141,11 +149,17 @@ export function RequestAccessPage() {
       );
 
       setLoadState({ status: "ready", idcUserId, idcUserEmail, idcUserDisplayName, permitted });
+      setRequests(
+        (requestsRes.data ?? []).filter((r): r is NonNullable<typeof r> => r !== null).map(toRow)
+      );
+      setCurrentPage(1);
     } catch (err) {
       setLoadState({
         status: "error",
         message: err instanceof Error ? err.message : "Failed to load access options",
       });
+    } finally {
+      setRequestsLoading(false);
     }
   }, []);
 
@@ -159,21 +173,15 @@ export function RequestAccessPage() {
       setRequests(
         (res.data ?? []).filter((r): r is NonNullable<typeof r> => r !== null).map(toRow)
       );
+      setCurrentPage(1);
     } finally {
       setRequestsLoading(false);
     }
   }, [loadState]);
 
   useEffect(() => {
-    loadPermittedAccess();
-  }, [loadPermittedAccess]);
-
-  // Load requests once the IDC user ID is known (needed for the GSI query)
-  useEffect(() => {
-    if (loadState.status === "ready") {
-      loadRequests();
-    }
-  }, [loadState.status, loadRequests]);
+    loadAll();
+  }, [loadAll]);
 
   function openModal() {
     setFormValues(EMPTY_FORM);
@@ -294,7 +302,7 @@ export function RequestAccessPage() {
     }
   }
 
-  const isLoading = loadState.status === "loading" || loadState.status === "idle";
+  const isLoading = loadState.status === "loading" || loadState.status === "idle" || requestsLoading;
 
   return (
     <>
@@ -313,7 +321,7 @@ export function RequestAccessPage() {
             <Alert
               type="error"
               header="Could not load access options"
-              action={<Button onClick={loadPermittedAccess}>Retry</Button>}
+              action={<Button onClick={loadAll}>Retry</Button>}
             >
               {loadState.message}
             </Alert>
@@ -357,9 +365,16 @@ export function RequestAccessPage() {
               cell: (item) => item.createdAt ?? "",
             },
           ]}
-          items={requests}
+          items={requests.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)}
           loading={requestsLoading}
           loadingText="Loading requests..."
+          pagination={
+            <Pagination
+              currentPageIndex={currentPage}
+              pagesCount={Math.max(1, Math.ceil(requests.length / PAGE_SIZE))}
+              onChange={({ detail }) => setCurrentPage(detail.currentPageIndex)}
+            />
+          }
           empty={
             <Box textAlign="center" color="inherit">
               <b>No requests</b>

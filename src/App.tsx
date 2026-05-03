@@ -2,7 +2,7 @@ import { useAuthenticator } from "@aws-amplify/ui-react";
 import { Route, Routes, useNavigate, useLocation } from "react-router-dom";
 
 import AppLayout from "@cloudscape-design/components/app-layout";
-import SideNavigation from "@cloudscape-design/components/side-navigation";
+import SideNavigation, { SideNavigationProps } from "@cloudscape-design/components/side-navigation";
 import TopNavigation from "@cloudscape-design/components/top-navigation";
 
 import { AdminGuard } from "./components/AdminGuard";
@@ -10,18 +10,24 @@ import { ApproveRequestsPage } from "./pages/ApproveRequestsPage";
 import { PrivilegedPoliciesPage } from "./pages/PrivilegedPoliciesPage";
 import { RequestAccessPage } from "./pages/RequestAccessPage";
 
-const NAV_ITEMS: React.ComponentProps<typeof SideNavigation>["items"] = [
+const NAV_ITEMS: SideNavigationProps.Item[] = [
   { type: "link", text: "Request Access", href: "#/" },
-  { type: "divider" },
-  { type: "link", text: "Approve Requests", href: "#/approve-requests" },
-  { type: "link", text: "Privileged Policies", href: "#/privileged-policies" },
+  {
+    type: "section",
+    text: "Administration",
+    defaultExpanded: true,
+    items: [
+      { type: "link", text: "Approve Requests", href: "#/approve-requests" },
+      { type: "link", text: "Privileged Policies", href: "#/privileged-policies" },
+    ],
+  },
 ];
 
 function AppNav() {
   const navigate = useNavigate();
-  const { hash } = useLocation();
-  // HashRouter exposes the path inside the hash, e.g. "#/privileged-policies"
-  const activeHref = `#${hash.replace(/^#/, "") || "/"}`;
+  // With HashRouter, the routed path lives in `pathname`, not in `hash`
+  const { pathname } = useLocation();
+  const activeHref = `#${pathname}`;
 
   return (
     <SideNavigation
@@ -30,7 +36,6 @@ function AppNav() {
       items={NAV_ITEMS}
       onFollow={(e) => {
         e.preventDefault();
-        // Strip the leading "#" so react-router receives a plain path
         navigate(e.detail.href.replace(/^#/, ""));
       }}
     />

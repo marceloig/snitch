@@ -20,6 +20,7 @@ import Select from "@cloudscape-design/components/select";
 import SpaceBetween from "@cloudscape-design/components/space-between";
 import Spinner from "@cloudscape-design/components/spinner";
 import Table from "@cloudscape-design/components/table";
+import Pagination from "@cloudscape-design/components/pagination";
 
 const client = generateClient<Schema>();
 
@@ -83,6 +84,8 @@ export function PrivilegedPoliciesPage() {
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [loadingPolicies, setLoadingPolicies] = useState(true);
   const [selectedItems, setSelectedItems] = useState<Policy[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const [modalMode, setModalMode] = useState<"create" | "edit" | null>(null);
   const [formValues, setFormValues] = useState<FormValues>(EMPTY_FORM);
@@ -108,6 +111,7 @@ export function PrivilegedPoliciesPage() {
     setLoadingPolicies(true);
     const { data } = await client.models.PrivilegedPolicy.list({});
     setPolicies(data);
+    setCurrentPage(1);
     setLoadingPolicies(false);
   }, []);
 
@@ -468,9 +472,16 @@ export function PrivilegedPoliciesPage() {
               width: 100,
             },
           ]}
-          items={policies}
+          items={policies.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)}
           loading={loadingPolicies}
           loadingText="Loading policies..."
+          pagination={
+            <Pagination
+              currentPageIndex={currentPage}
+              pagesCount={Math.max(1, Math.ceil(policies.length / PAGE_SIZE))}
+              onChange={({ detail }) => setCurrentPage(detail.currentPageIndex)}
+            />
+          }
           empty={
             <Box textAlign="center" color="inherit">
               <b>No policies</b>
