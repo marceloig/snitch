@@ -31,6 +31,7 @@ type RequestRow = {
   permissionSetArn: string;
   durationMinutes: number;
   justification: string;
+  startTime: string | null;
   createdAt: string;
 };
 
@@ -45,6 +46,7 @@ function toRow(item: NonNullable<PendingRequest>): RequestRow {
     permissionSetArn: item.permissionSetArn ?? "",
     durationMinutes: item.durationMinutes ?? 0,
     justification: item.justification ?? "",
+    startTime: item.startTime ?? null,
     createdAt: item.createdAt ?? "",
   };
 }
@@ -188,6 +190,11 @@ export function ApproveRequestsPage() {
                   <StatusIndicator type="pending">Pending approval</StatusIndicator>
                 ),
                 width: 160,
+              },
+              {
+                id: "startTime",
+                header: "Start time",
+                cell: (item) => item.startTime ?? "—",
               },
               {
                 id: "createdAt",

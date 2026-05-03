@@ -19,6 +19,7 @@ type RequestAccessInput = {
   durationMinutes: number;
   requiresApproval?: boolean | null;
   justification: string;
+  startTime?: string | null;
 };
 
 type AppSyncEvent = { arguments: RequestAccessInput };
@@ -34,7 +35,8 @@ export type AccessRequest = {
   durationMinutes: number;
   requiresApproval: boolean;
   justification: string;
-  status: "PENDING" | "PENDING_APPROVAL" | "ACTIVE" | "EXPIRED" | "FAILED" | "REJECTED";
+  startTime: string | null;
+  status: "PENDING" | "PENDING_APPROVAL" | "SCHEDULED" | "ACTIVE" | "EXPIRED" | "FAILED" | "REJECTED";
   taskToken: string | null;
   approvedBy: string | null;
   approverComment: string | null;
@@ -62,9 +64,16 @@ export const handler = async (event: AppSyncEvent): Promise<AccessRequest> => {
   // passed through the mutation. The AVP check already enforces who can request
   // what; approval is a workflow gate on top of that authorization.
   const requiresApproval = args.requiresApproval === true;
+  const startTime = args.startTime ?? null;
 
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
+
+  const initialStatus = requiresApproval
+    ? "PENDING_APPROVAL"
+    : startTime
+    ? "SCHEDULED"
+    : "PENDING";
 
   const item: AccessRequest = {
     id,
@@ -77,7 +86,8 @@ export const handler = async (event: AppSyncEvent): Promise<AccessRequest> => {
     durationMinutes: args.durationMinutes,
     requiresApproval,
     justification: args.justification,
-    status: requiresApproval ? "PENDING_APPROVAL" : "PENDING",
+    startTime,
+    status: initialStatus,
     taskToken: null,
     approvedBy: null,
     approverComment: null,
@@ -99,6 +109,7 @@ export const handler = async (event: AppSyncEvent): Promise<AccessRequest> => {
         permissionSetArn: args.permissionSetArn,
         durationSeconds: args.durationMinutes * 60,
         requiresApproval,
+        startTime,
       }),
     })
   );

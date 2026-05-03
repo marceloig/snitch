@@ -40,9 +40,8 @@ export function setupAccessRequestWorkflow(
   });
 
   accessRequestTable.addGlobalSecondaryIndex({
-    indexName: "byIdcUserIdCreatedAt",
-    partitionKey: { name: "idcUserId", type: AttributeType.STRING },
-    sortKey: { name: "createdAt", type: AttributeType.STRING },
+    indexName: "byIdcUserId",
+    partitionKey: { name: "idcUserId", type: AttributeType.STRING }
   });
 
   // ─── IAM policies ──────────────────────────────────────────────────────────
@@ -140,7 +139,7 @@ export function setupAccessRequestWorkflow(
             Next: "WaitForApproval",
           },
         ],
-        Default: "AssignPermissionSet",
+        Default: "CheckStartTime",
       },
 
       // Invokes storeApprovalTokenHandler with the task token injected by SFN.
@@ -157,15 +156,16 @@ export function setupAccessRequestWorkflow(
             "accountId.$": "$.accountId",
             "permissionSetArn.$": "$.permissionSetArn",
             "durationSeconds.$": "$.durationSeconds",
+            "startTime.$": "$.startTime",
             "taskToken.$": "$$.Task.Token",
           },
         },
         // OutputPath: "$" means the JSON object from SendTaskSuccess.output
-        // flows directly to AssignPermissionSet as its payload.
+        // flows directly to CheckStartTime as its payload.
         OutputPath: "$",
         // Heartbeat acts as the approval deadline: 24 hours.
         HeartbeatSeconds: 86400,
-        Next: "AssignPermissionSet",
+        Next: "CheckStartTime",
         Catch: [
           {
             // 24-hour heartbeat timeout — no approval received in time.
@@ -215,6 +215,45 @@ export function setupAccessRequestWorkflow(
       RejectionHandled: {
         Type: "Pass",
         End: true,
+      },
+
+      // ─── Scheduled start-time gate ────────────────────────────────────────
+      CheckStartTime: {
+        Type: "Choice",
+        Choices: [
+          {
+            And: [
+              { Variable: "$.startTime", IsPresent: true },
+              { Variable: "$.startTime", IsNull: false },
+            ],
+            Next: "SetStatusScheduled",
+          },
+        ],
+        Default: "AssignPermissionSet",
+      },
+
+      // DynamoDB SDK integration — writes SCHEDULED without a Lambda cold start.
+      SetStatusScheduled: {
+        Type: "Task",
+        Resource: "arn:aws:states:::aws-sdk:dynamodb:updateItem",
+        Parameters: {
+          TableName: accessRequestTable.tableName,
+          Key: { id: { "S.$": "$.requestId" } },
+          UpdateExpression: "SET #s = :s, updatedAt = :now",
+          ExpressionAttributeNames: { "#s": "status" },
+          ExpressionAttributeValues: {
+            ":s": { S: "SCHEDULED" },
+            ":now": { "S.$": "$$.State.EnteredTime" },
+          },
+        },
+        ResultPath: null,
+        Next: "WaitUntilStartTime",
+      },
+
+      WaitUntilStartTime: {
+        Type: "Wait",
+        TimestampPath: "$.startTime",
+        Next: "AssignPermissionSet",
       },
 
       // ─── Permission assignment ─────────────────────────────────────────────

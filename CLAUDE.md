@@ -71,6 +71,29 @@ CheckApproval → WaitForApproval (waitForTaskToken, 24h heartbeat)
 
 `setupAccessRequestWorkflow()` returns `{ accessRequestTableArn, accessRequestTableName }` so `backend.ts` can wire up the approval Lambdas (which live in a different stack) without creating a circular dependency.
 
+### AWS CLI — never run directly; always ask first
+
+**Never execute any AWS CLI command (`aws ...`) that mutates cloud state.** This includes but is not limited to:
+
+- Creating, updating, or deleting any resource (`aws dynamodb`, `aws iam`, `aws sso-admin`, `aws verifiedpermissions`, `aws stepfunctions`, `aws cloudformation`, etc.)
+- Deploying or deleting stacks (`aws cloudformation deploy/delete-stack`)
+- Modifying IAM roles, policies, or trust relationships
+- Any `aws amplify` or `aws s3` mutating operations
+
+**Why:** Any change made directly through the AWS CLI bypasses CloudFormation/CDK and causes **drift** — the infrastructure state diverges from what CDK believes is deployed. Drift breaks future `cdk deploy` / `npm run sandbox` runs in unpredictable ways and can silently corrupt stack state.
+
+**Rule:** If an AWS CLI action appears necessary (e.g., to investigate a bug or unblock a deploy), stop and ask the user to confirm and run it manually. Read-only/diagnostic commands (`aws ... describe-*`, `aws ... list-*`, `aws ... get-*`) are fine to suggest but still require user approval before execution. All infrastructure changes must go through CDK code and be deployed via `npm run sandbox` or the CI pipeline.
+
+### CDK / DynamoDB change constraints
+
+**DynamoDB only allows one GSI creation or deletion per CloudFormation update.** Renaming a GSI or adding/removing a sort key counts as a delete + create — two operations — and CloudFormation will reject it with `Cannot perform more than one GSI creation or deletion in a single update`.
+
+Safe procedure for any GSI rename or sort-key change:
+1. **Deploy 1** — add the new GSI with the desired name/keys, and update handlers to use the new `IndexName`.
+2. **Deploy 2** — delete the old GSI (remove the `addGlobalSecondaryIndex` call).
+
+Never combine a GSI deletion and a GSI creation in the same CDK deploy. This applies to the `AccessRequestTable` in `amplify/accessRequestWorkflow.ts` and any other DynamoDB table managed by CDK in this project.
+
 ### Approval stack separation — why `approveRequest`, `rejectRequest`, `listPendingApprovals` are in the `data` stack
 
 These three AppSync resolvers are defined in `amplify/data/resource.ts` so AppSync can reference their Lambda ARNs. If they were in the `AccessRequestWorkflow` stack, the dependency graph would be circular:

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import createWrapper from "@cloudscape-design/components/test-utils/dom";
 
 // vi.hoisted ensures mock functions exist before vi.mock factories execute
 const { mockGetMyIDCUser, mockEvaluateMyAccess, mockListMyAccessRequests, mockRequestAccess } =
@@ -279,6 +280,111 @@ describe("RequestAccessPage", () => {
       expect(
         screen.getByPlaceholderText(/describe the business reason/i)
       ).toHaveValue("");
+    });
+  });
+
+  describe("modal — start time field", () => {
+    async function openModal(permitted = [ACCOUNT_1]) {
+      successfulLoad(permitted);
+      render(<RequestAccessPage />);
+      await waitFor(() => screen.getByRole("button", { name: /new request/i }));
+      await userEvent.click(screen.getByRole("button", { name: /new request/i }));
+    }
+
+    it("renders the 'Start time (optional)' label in the modal", async () => {
+      await openModal();
+      expect(screen.getByText("Start time (optional)")).toBeInTheDocument();
+    });
+
+    it("a time value entered without a date does not trigger start time validation", async () => {
+      await openModal();
+      // Cloudscape TimeInput disabled state is CSS-only in jsdom; set value programmatically
+      createWrapper().findTimeInput()!.setInputValue("23:59");
+      await userEvent.click(screen.getByRole("button", { name: /submit request/i }));
+      // Validation skips startTime when startTimeDate is empty
+      expect(
+        screen.queryByText(/start time must be in the future/i)
+      ).not.toBeInTheDocument();
+    });
+
+    it("a time entered alongside a past date triggers the start time error", async () => {
+      await openModal();
+      createWrapper().findDatePicker()!.setInputValue("2020/01/01");
+      createWrapper().findTimeInput()!.setInputValue("10:00");
+      await userEvent.click(screen.getByRole("button", { name: /submit request/i }));
+      expect(
+        screen.getByText("Start time must be in the future.")
+      ).toBeInTheDocument();
+    });
+
+    it("shows 'Start time must be in the future.' when the date is in the past", async () => {
+      await openModal();
+      createWrapper().findDatePicker()!.setInputValue("2020/01/01");
+      await userEvent.click(screen.getByRole("button", { name: /submit request/i }));
+      expect(
+        screen.getByText("Start time must be in the future.")
+      ).toBeInTheDocument();
+    });
+
+    it("does not show a start time error when the field is left empty", async () => {
+      await openModal();
+      await userEvent.click(screen.getByRole("button", { name: /submit request/i }));
+      expect(
+        screen.queryByText(/start time must be in the future/i)
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/enter a valid date and time/i)
+      ).not.toBeInTheDocument();
+    });
+
+    it("does not show a start time error when a valid future date is provided", async () => {
+      await openModal();
+      createWrapper().findDatePicker()!.setInputValue("2027/01/01");
+      await userEvent.click(screen.getByRole("button", { name: /submit request/i }));
+      expect(
+        screen.queryByText(/start time must be in the future/i)
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/enter a valid date and time/i)
+      ).not.toBeInTheDocument();
+    });
+
+    it("clears the start time error when the modal is closed and reopened", async () => {
+      successfulLoad([ACCOUNT_1]);
+      render(<RequestAccessPage />);
+      await waitFor(() => screen.getByRole("button", { name: /new request/i }));
+
+      // Open → set a past date → submit → error appears
+      await userEvent.click(screen.getByRole("button", { name: /new request/i }));
+      createWrapper().findDatePicker()!.setInputValue("2020/01/01");
+      await userEvent.click(screen.getByRole("button", { name: /submit request/i }));
+      expect(
+        screen.getByText("Start time must be in the future.")
+      ).toBeInTheDocument();
+
+      // Cancel → reopen → error is gone
+      const dialog = screen.getByRole("dialog", { name: /new access request/i });
+      await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      await userEvent.click(screen.getByRole("button", { name: /new request/i }));
+      expect(
+        screen.queryByText(/start time must be in the future/i)
+      ).not.toBeInTheDocument();
+    });
+
+    it("clears the date input when the modal is closed and reopened", async () => {
+      successfulLoad([ACCOUNT_1]);
+      render(<RequestAccessPage />);
+      await waitFor(() => screen.getByRole("button", { name: /new request/i }));
+
+      await userEvent.click(screen.getByRole("button", { name: /new request/i }));
+      createWrapper().findDatePicker()!.setInputValue("2027/01/01");
+      expect(createWrapper().findDatePicker()!.getInputValue()).toBe("2027/01/01");
+
+      const dialog = screen.getByRole("dialog", { name: /new access request/i });
+      await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      await userEvent.click(screen.getByRole("button", { name: /new request/i }));
+
+      expect(createWrapper().findDatePicker()!.getInputValue()).toBe("");
     });
   });
 });

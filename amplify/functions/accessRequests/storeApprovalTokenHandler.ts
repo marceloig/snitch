@@ -13,6 +13,7 @@ type StoreTokenInput = {
   permissionSetArn: string;
   durationSeconds: number;
   taskToken: string;
+  startTime?: string | null;
 };
 
 /**

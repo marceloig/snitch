@@ -7,6 +7,7 @@ import Alert from "@cloudscape-design/components/alert";
 import Box from "@cloudscape-design/components/box";
 import Button from "@cloudscape-design/components/button";
 import ContentLayout from "@cloudscape-design/components/content-layout";
+import DatePicker from "@cloudscape-design/components/date-picker";
 import Form from "@cloudscape-design/components/form";
 import FormField from "@cloudscape-design/components/form-field";
 import Header from "@cloudscape-design/components/header";
@@ -35,6 +36,7 @@ type AccessRequestRow = {
   permissionSetName: string;
   durationMinutes: number;
   status: string;
+  startTime: string | null;
   stepFunctionExecutionArn: string | null;
   createdAt: string;
   updatedAt: string;
@@ -49,6 +51,7 @@ function toRow(item: NonNullable<AccessRequest>): AccessRequestRow {
     permissionSetName: item.permissionSetName ?? "",
     durationMinutes: item.durationMinutes ?? 0,
     status: item.status ?? "PENDING",
+    startTime: item.startTime ?? null,
     stepFunctionExecutionArn: item.stepFunctionExecutionArn ?? null,
     createdAt: item.createdAt ?? "",
     updatedAt: item.updatedAt ?? "",
@@ -70,6 +73,8 @@ type FormValues = {
   permissionSet: SelectProps.Option | null;
   durationMinutes: string;
   justification: string;
+  startTimeDate: string;
+  startTimeTime: string;
 };
 
 type FormErrors = {
@@ -77,14 +82,15 @@ type FormErrors = {
   permissionSet: string;
   durationMinutes: string;
   justification: string;
+  startTime: string;
 };
 
-const EMPTY_FORM: FormValues = { account: null, permissionSet: null, durationMinutes: "", justification: "" };
-const EMPTY_ERRORS: FormErrors = { account: "", permissionSet: "", durationMinutes: "", justification: "" };
+const EMPTY_FORM: FormValues = { account: null, permissionSet: null, durationMinutes: "", justification: "", startTimeDate: "", startTimeTime: "" };
+const EMPTY_ERRORS: FormErrors = { account: "", permissionSet: "", durationMinutes: "", justification: "", startTime: "" };
 
 function requestStatusType(
   status: string | null | undefined
-): "success" | "pending" | "stopped" | "error" {
+): "success" | "pending" | "stopped" | "error" | "info" | "warning" {
   switch (status) {
     case "ACTIVE":
       return "success";
@@ -95,7 +101,9 @@ function requestStatusType(
     case "REJECTED":
       return "error";
     case "PENDING_APPROVAL":
-      return "pending";
+      return "warning";
+    case "SCHEDULED":
+      return "info";
     default:
       return "pending";
   }
@@ -222,7 +230,7 @@ export function RequestAccessPage() {
   }
 
   function validate(): boolean {
-    const errors: FormErrors = { account: "", permissionSet: "", durationMinutes: "", justification: "" };
+    const errors: FormErrors = { account: "", permissionSet: "", durationMinutes: "", justification: "", startTime: "" };
     let valid = true;
 
     if (!formValues.account) {
@@ -267,6 +275,18 @@ export function RequestAccessPage() {
       valid = false;
     }
 
+    if (formValues.startTimeDate) {
+      const timeStr = formValues.startTimeTime || "00:00";
+      const dt = new Date(`${formValues.startTimeDate}T${timeStr}`);
+      if (isNaN(dt.getTime())) {
+        errors.startTime = "Enter a valid date and time.";
+        valid = false;
+      } else if (dt <= new Date()) {
+        errors.startTime = "Start time must be in the future.";
+        valid = false;
+      }
+    }
+
     setFormErrors(errors);
     return valid;
   }
@@ -299,6 +319,9 @@ export function RequestAccessPage() {
         })(),
         requiresApproval: permittedEntry?.requiresApproval ?? false,
         justification: formValues.justification.trim(),
+        startTime: formValues.startTimeDate
+          ? new Date(`${formValues.startTimeDate}T${formValues.startTimeTime || "00:00"}`).toISOString()
+          : undefined,
       });
 
       if (res.errors?.length) {
@@ -373,6 +396,11 @@ export function RequestAccessPage() {
                 </StatusIndicator>
               ),
               width: 130,
+            },
+            {
+              id: "startTime",
+              header: "Start time",
+              cell: (item) => item.startTime ?? "—",
             },
             {
               id: "createdAt",
@@ -463,6 +491,8 @@ export function RequestAccessPage() {
                       permissionSet: null,
                       durationMinutes: formValues.durationMinutes,
                       justification: formValues.justification,
+                      startTimeDate: formValues.startTimeDate,
+                      startTimeTime: formValues.startTimeTime,
                     })
                   }
                   options={accountOptions()}
@@ -542,6 +572,32 @@ export function RequestAccessPage() {
                   placeholder="Describe the business reason for this access request."
                   rows={3}
                 />
+              </FormField>
+
+              <FormField
+                label="Start time (optional)"
+                description="When you need access to start. Leave empty to start immediately."
+                errorText={formErrors.startTime}
+              >
+                <SpaceBetween direction="horizontal" size="xs">
+                  <DatePicker
+                    value={formValues.startTimeDate}
+                    onChange={({ detail }) =>
+                      setFormValues((prev) => ({ ...prev, startTimeDate: detail.value }))
+                    }
+                    placeholder="YYYY/MM/DD"
+                  />
+                  <TimeInput
+                    format="hh:mm"
+                    placeholder="hh:mm"
+                    use24Hour={true}
+                    value={formValues.startTimeTime}
+                    onChange={({ detail }) =>
+                      setFormValues((prev) => ({ ...prev, startTimeTime: detail.value }))
+                    }
+                    disabled={!formValues.startTimeDate}
+                  />
+                </SpaceBetween>
               </FormField>
             </SpaceBetween>
           </Form>

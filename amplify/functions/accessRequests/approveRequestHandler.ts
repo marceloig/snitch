@@ -73,7 +73,7 @@ export const handler = async (event: AppSyncEvent) => {
     })
   );
 
-  // Resume the Step Function — output flows into AssignPermissionSet as its payload
+  // Resume the Step Function — output flows into CheckStartTime as its payload
   await sfn.send(
     new SendTaskSuccessCommand({
       taskToken: request.taskToken,
@@ -83,6 +83,7 @@ export const handler = async (event: AppSyncEvent) => {
         accountId: request.accountId,
         permissionSetArn: request.permissionSetArn,
         durationSeconds: (request.durationMinutes as number) * 60,
+        startTime: request.startTime ?? null,
       }),
     })
   );
