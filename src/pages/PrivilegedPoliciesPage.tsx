@@ -3,25 +3,33 @@ import { generateClient } from "aws-amplify/data";
 import { getCurrentUser } from "aws-amplify/auth";
 import type { Schema } from "../../amplify/data/resource";
 import type { SelectProps } from "@cloudscape-design/components/select";
+import { useCollection } from "@cloudscape-design/collection-hooks";
+import {
+  todayDateStr,
+  minutesToMaxDuration,
+  maxDurationToMinutes,
+  formatDuration,
+} from "@/utils/duration";
 
 import Alert from "@cloudscape-design/components/alert";
 import Box from "@cloudscape-design/components/box";
 import Button from "@cloudscape-design/components/button";
 import ContentLayout from "@cloudscape-design/components/content-layout";
+import DatePicker from "@cloudscape-design/components/date-picker";
 import Form from "@cloudscape-design/components/form";
 import FormField from "@cloudscape-design/components/form-field";
 import Header from "@cloudscape-design/components/header";
 import Input from "@cloudscape-design/components/input";
 import Modal from "@cloudscape-design/components/modal";
-import DatePicker from "@cloudscape-design/components/date-picker";
-import TimeInput from "@cloudscape-design/components/time-input";
-import Toggle from "@cloudscape-design/components/toggle";
 import Multiselect from "@cloudscape-design/components/multiselect";
+import Pagination from "@cloudscape-design/components/pagination";
 import Select from "@cloudscape-design/components/select";
 import SpaceBetween from "@cloudscape-design/components/space-between";
 import Spinner from "@cloudscape-design/components/spinner";
 import Table from "@cloudscape-design/components/table";
-import Pagination from "@cloudscape-design/components/pagination";
+import TextFilter from "@cloudscape-design/components/text-filter";
+import TimeInput from "@cloudscape-design/components/time-input";
+import Toggle from "@cloudscape-design/components/toggle";
 
 const client = generateClient<Schema>();
 
@@ -33,12 +41,7 @@ const PRINCIPAL_TYPE_OPTIONS: Option[] = [
   { label: "Group", value: "GROUP" },
 ];
 
-import {
-  todayDateStr,
-  minutesToMaxDuration,
-  maxDurationToMinutes,
-  formatDuration,
-} from "@/utils/duration";
+const PAGE_SIZE = 10;
 
 type FormValues = {
   name: string;
@@ -93,9 +96,6 @@ const EMPTY_RESOURCES: AWSResources = {
 export function PrivilegedPoliciesPage() {
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [loadingPolicies, setLoadingPolicies] = useState(true);
-  const [selectedItems, setSelectedItems] = useState<Policy[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 10;
 
   const [modalMode, setModalMode] = useState<"create" | "edit" | null>(null);
   const [formValues, setFormValues] = useState<FormValues>(EMPTY_FORM);
@@ -113,6 +113,31 @@ export function PrivilegedPoliciesPage() {
   const [currentUsername, setCurrentUsername] = useState<string>("");
   const [deleting, setDeleting] = useState(false);
 
+  const { items, filterProps, paginationProps, collectionProps, actions, filteredItemsCount } =
+    useCollection(policies, {
+      filtering: {
+        filteringFunction: (item, text) =>
+          item.name.toLowerCase().includes(text.toLowerCase()),
+        empty: (
+          <Box textAlign="center" color="inherit">
+            <b>No policies</b>
+            <Box padding={{ bottom: "s" }} variant="p" color="inherit">
+              Create your first privileged policy to get started.
+            </Box>
+          </Box>
+        ),
+        noMatch: (
+          <Box textAlign="center" color="inherit">
+            No policies match the current filter
+          </Box>
+        ),
+      },
+      pagination: { pageSize: PAGE_SIZE },
+      selection: { trackBy: "id" },
+    });
+
+  const selectedItems = collectionProps.selectedItems as Policy[];
+
   useEffect(() => {
     getCurrentUser().then((u) => setCurrentUsername(u.username)).catch(() => {});
   }, []);
@@ -121,8 +146,9 @@ export function PrivilegedPoliciesPage() {
     setLoadingPolicies(true);
     const { data } = await client.models.PrivilegedPolicy.list({});
     setPolicies(data);
-    setCurrentPage(1);
+    actions.setCurrentPage(1);
     setLoadingPolicies(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -144,7 +170,6 @@ export function PrivilegedPoliciesPage() {
           client.queries.listCognitoGroups(),
         ]);
 
-      // GraphQL errors surface as data=null without throwing — treat them as failures
       const graphqlErrors = [
         usersRes, groupsRes, accountsRes, ousRes, psRes, cognitoUsersRes, cognitoGroupsRes,
       ].flatMap((r) => r.errors ?? []);
@@ -157,7 +182,6 @@ export function PrivilegedPoliciesPage() {
         return;
       }
 
-      // Null data (no GraphQL error) means resolver returned nothing — likely not deployed
       const hasNullData = [
         usersRes, groupsRes, accountsRes, ousRes, psRes, cognitoUsersRes, cognitoGroupsRes,
       ].some((r) => r.data === null);
@@ -168,8 +192,6 @@ export function PrivilegedPoliciesPage() {
         return;
       }
 
-      // currentUsername is captured at the time loadAWSResources runs;
-      // resolved via the closure updated by the useEffect above.
       const cognitoUserOptions = (cognitoUsersRes.data ?? [])
         .filter((u) => u?.username !== currentUsername)
         .map((u) => ({
@@ -388,7 +410,7 @@ export function PrivilegedPoliciesPage() {
       }
 
       setModalMode(null);
-      setSelectedItems([]);
+      actions.setSelectedItems([]);
       await fetchPolicies();
     } catch {
       setFormError("Failed to save policy. Please try again.");
@@ -403,7 +425,7 @@ export function PrivilegedPoliciesPage() {
     setDeleting(true);
     try {
       await client.mutations.deletePrivilegedPolicyWithAVP({ id: policy.id });
-      setSelectedItems([]);
+      actions.setSelectedItems([]);
       await fetchPolicies();
     } finally {
       setDeleting(false);
@@ -414,6 +436,10 @@ export function PrivilegedPoliciesPage() {
     formValues.principalType.value === "GROUP"
       ? awsResources.groups
       : awsResources.users;
+
+  const counterText = filterProps.filteringText
+    ? `(${filteredItemsCount} / ${policies.length})`
+    : `(${policies.length})`;
 
   return (
     <>
@@ -428,9 +454,10 @@ export function PrivilegedPoliciesPage() {
         }
       >
         <Table
+          {...collectionProps}
           selectionType="single"
-          selectedItems={selectedItems}
-          onSelectionChange={({ detail }) => setSelectedItems(detail.selectedItems)}
+          loading={loadingPolicies}
+          loadingText="Loading policies..."
           columnDefinitions={[
             {
               id: "name",
@@ -487,27 +514,23 @@ export function PrivilegedPoliciesPage() {
               width: 100,
             },
           ]}
-          items={policies.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)}
-          loading={loadingPolicies}
-          loadingText="Loading policies..."
-          pagination={
-            <Pagination
-              currentPageIndex={currentPage}
-              pagesCount={Math.max(1, Math.ceil(policies.length / PAGE_SIZE))}
-              onChange={({ detail }) => setCurrentPage(detail.currentPageIndex)}
+          items={items}
+          filter={
+            <TextFilter
+              {...filterProps}
+              filteringPlaceholder="Find by name"
+              countText={
+                filteredItemsCount !== undefined
+                  ? `${filteredItemsCount} match${filteredItemsCount !== 1 ? "es" : ""}`
+                  : undefined
+              }
             />
           }
-          empty={
-            <Box textAlign="center" color="inherit">
-              <b>No policies</b>
-              <Box padding={{ bottom: "s" }} variant="p" color="inherit">
-                Create your first privileged policy to get started.
-              </Box>
-            </Box>
-          }
+          pagination={<Pagination {...paginationProps} />}
           header={
             <Header
               variant="h2"
+              counter={counterText}
               actions={
                 <SpaceBetween direction="horizontal" size="xs">
                   <Button
