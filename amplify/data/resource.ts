@@ -108,6 +108,7 @@ const schema = a.schema({
     startTime: a.string(),
     approvedBy: a.string(),
     approverComment: a.string(),
+    revokeComment: a.string(),
     createdAt: a.string(),
     updatedAt: a.string(),
   }),
@@ -300,7 +301,7 @@ const schema = a.schema({
   // Admin-only. The request must have status ACTIVE.
   revokeAccess: a
     .mutation()
-    .arguments({ requestId: a.string().required() })
+    .arguments({ requestId: a.string().required(), revokeComment: a.string() })
     .returns(a.ref("AccessRequestItem"))
     .handler(a.handler.function(revokeAccessFunction))
     .authorization((allow) => [allow.group("Admins")]),

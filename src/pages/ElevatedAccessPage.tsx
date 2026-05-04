@@ -19,6 +19,8 @@ import StatusIndicator from "@cloudscape-design/components/status-indicator";
 import Table from "@cloudscape-design/components/table";
 import TextContent from "@cloudscape-design/components/text-content";
 import TextFilter from "@cloudscape-design/components/text-filter";
+import Textarea from "@cloudscape-design/components/textarea";
+import FormField from "@cloudscape-design/components/form-field";
 
 const client = generateClient<Schema>();
 
@@ -67,6 +69,7 @@ type AccessRequestRow = {
   status: string;
   durationMinutes: number;
   createdAt: string;
+  revokeComment: string;
 };
 
 type RawItem = NonNullable<
@@ -83,6 +86,7 @@ function toRow(item: NonNullable<RawItem>): AccessRequestRow {
     status: item.status ?? "",
     durationMinutes: item.durationMinutes ?? 0,
     createdAt: item.createdAt ?? "",
+    revokeComment: item.revokeComment ?? "",
   };
 }
 
@@ -96,6 +100,7 @@ export function ElevatedAccessPage() {
   const [revokeModalOpen, setRevokeModalOpen] = useState(false);
   const [revoking, setRevoking] = useState(false);
   const [revokeError, setRevokeError] = useState("");
+  const [revokeComment, setRevokeComment] = useState("");
 
   const loadRequests = useCallback(async () => {
     setLoading(true);
@@ -168,14 +173,22 @@ export function ElevatedAccessPage() {
     setRevoking(true);
     setRevokeError("");
     try {
-      const res = await client.mutations.revokeAccess({ requestId: selected.id });
+      const res = await client.mutations.revokeAccess({
+        requestId: selected.id,
+        revokeComment: revokeComment.trim() || undefined,
+      });
       if (res.errors?.length) {
         throw new Error(res.errors.map((e) => e.message).join("; "));
       }
       setRevokeModalOpen(false);
+      setRevokeComment("");
       actions.setSelectedItems([]);
       setAllRequests((prev) =>
-        prev.map((r) => (r.id === selected.id ? { ...r, status: "REVOKED" } : r))
+        prev.map((r) =>
+          r.id === selected.id
+            ? { ...r, status: "REVOKED", revokeComment: revokeComment.trim() }
+            : r
+        )
       );
     } catch (err) {
       setRevokeError(
@@ -239,6 +252,11 @@ export function ElevatedAccessPage() {
               header: "Requested at",
               cell: (r) => r.createdAt,
             },
+            {
+              id: "revokeComment",
+              header: "Revoke reason",
+              cell: (r) => r.revokeComment || "—",
+            },
           ]}
           filter={
             <SpaceBetween direction="horizontal" size="xs">
@@ -278,6 +296,7 @@ export function ElevatedAccessPage() {
                     disabled={!canRevoke}
                     onClick={() => {
                       setRevokeError("");
+                      setRevokeComment("");
                       setRevokeModalOpen(true);
                     }}
                   >
@@ -339,6 +358,17 @@ export function ElevatedAccessPage() {
                 <p>This action cannot be undone.</p>
               </TextContent>
             )}
+            <FormField
+              label="Justification"
+              description="Reason for revoking access early. Stored with the request for audit purposes."
+            >
+              <Textarea
+                value={revokeComment}
+                onChange={({ detail }) => setRevokeComment(detail.value)}
+                placeholder="Enter the reason for revoking access..."
+                rows={3}
+              />
+            </FormField>
           </SpaceBetween>
         </Modal>
       </SpaceBetween>

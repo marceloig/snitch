@@ -8,7 +8,7 @@ const TABLE_NAME = process.env.ACCESS_REQUEST_TABLE_NAME!;
 const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION }));
 const sfn = new SFNClient({ region: REGION });
 
-type RevokeInput = { requestId: string };
+type RevokeInput = { requestId: string; revokeComment?: string | null };
 type AppSyncEvent = { arguments: RevokeInput; identity: unknown };
 
 /**
@@ -21,7 +21,7 @@ type AppSyncEvent = { arguments: RevokeInput; identity: unknown };
  * admins click revoke simultaneously.
  */
 export const handler = async (event: AppSyncEvent) => {
-  const { requestId } = event.arguments;
+  const { requestId, revokeComment } = event.arguments;
 
   const getResult = await dynamo.send(
     new GetCommand({ TableName: TABLE_NAME, Key: { id: requestId } })
@@ -45,16 +45,19 @@ export const handler = async (event: AppSyncEvent) => {
   const token = request.taskToken as string;
   const now = new Date().toISOString();
 
-  // Clear the token first to prevent concurrent revoke calls from double-sending
+  // Clear the token and store the revoke comment atomically.
+  // ConditionExpression prevents concurrent revoke calls from double-sending.
   await dynamo.send(
     new UpdateCommand({
       TableName: TABLE_NAME,
       Key: { id: requestId },
-      UpdateExpression: "SET taskToken = :null, updatedAt = :now",
+      UpdateExpression:
+        "SET taskToken = :null, revokeComment = :comment, updatedAt = :now",
       ConditionExpression: "#s = :active AND taskToken = :token",
       ExpressionAttributeNames: { "#s": "status" },
       ExpressionAttributeValues: {
         ":null": null,
+        ":comment": revokeComment ?? null,
         ":now": now,
         ":active": "ACTIVE",
         ":token": token,
@@ -81,6 +84,7 @@ export const handler = async (event: AppSyncEvent) => {
     ...request,
     status: "REVOKED",
     taskToken: null,
+    revokeComment: revokeComment ?? null,
     updatedAt: now,
   };
 };
