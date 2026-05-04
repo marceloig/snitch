@@ -123,6 +123,18 @@ IAM grants and env vars for `data`-stack functions are set in `backend.ts` using
 
 ### `amplify/data/resource.ts` is the GraphQL contract
 
-### `amplify/data/resource.ts` is the GraphQL contract
-
 All AppSync queries/mutations and their Lambda resolvers are declared here. Adding a new Lambda-backed operation requires: (1) a function resource in a `resource.ts` file, (2) an entry in this schema, (3) import + registration in `backend.ts`, and (4) the IAM grants in `backend.ts`.
+
+### `revokeComment` — admin audit field on `AccessRequestItem`
+
+When an admin revokes an ACTIVE request via the Elevated Access page, an optional `revokeComment` is written to the DDB record in the same atomic `UpdateCommand` that clears the task token. It surfaces as a "Revoke reason" column in the Elevated Access table. The `revokeAccess` mutation accepts `revokeComment` as an optional argument; `revokeAccessHandler.ts` persists it and returns it in the response.
+
+### Max Duration — stored as total minutes, entered as date + time
+
+`PrivilegedPolicy.maxDurationMinutes` stores a total-minute integer. The form UI uses a `DatePicker` + `TimeInput` pair where the date defaults to today and can be up to 1 year in the future. The helpers in `src/utils/duration.ts` convert between the two representations:
+
+- `maxDurationToMinutes(date, time)` — DatePicker `YYYY-MM-DD` + TimeInput `hh:mm` → minutes (used on save)
+- `minutesToMaxDuration(minutes)` → `{ date, time }` relative to today (used to populate the edit form)
+- `todayDateStr()` — returns today as `YYYY-MM-DD` (the format Cloudscape `DatePicker` uses internally; displayed as `YYYY/MM/DD` in the UI)
+
+`formatDuration(minutes)` in the same file renders stored minutes as a human-readable label (`45min`, `8h 30min`, `2d 8h`) and is used in every table that shows a duration column.

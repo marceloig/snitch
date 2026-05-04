@@ -50,7 +50,8 @@ snitch/
 ├── src/
 │   ├── components/             # Reusable UI components
 │   ├── hooks/                  # Custom React hooks
-│   ├── utils/                  # Helper functions
+│   ├── utils/
+│   │   └── duration.ts         # Shared: todayDateStr, minutesToMaxDuration, maxDurationToMinutes, formatDuration
 │   ├── types/                  # Shared TypeScript types
 │   ├── pages/
 │   │   ├── PrivilegedPoliciesPage.tsx  # Admin CRUD for privileged policies (with approval config)
@@ -140,7 +141,7 @@ AssignPermissionSet → WaitForEarlyRevocation → RemovePermissionSet
 | `rejectRequestHandler.ts` | data | Validates approver, sets `REJECTED` atomically, calls `SendTaskFailure` |
 | `listPendingApprovalsHandler.ts` | data | Returns `PENDING_APPROVAL` requests the calling admin can act on |
 | `listAllAccessRequestsHandler.ts` | data | Returns all requests across all users (admin-only, newest first) |
-| `revokeAccessHandler.ts` | data | Signals `WaitForEarlyRevocation` via `SendTaskSuccess` to trigger early removal |
+| `revokeAccessHandler.ts` | data | Signals `WaitForEarlyRevocation` via `SendTaskSuccess`; persists optional `revokeComment` for audit |
 
 `approveRequest`, `rejectRequest`, `listPendingApprovals`, `listAllAccessRequests`, `revokeAccess` are in the `data` stack (`resourceGroupName: "data"`) — see `CLAUDE.md` for why.
 
@@ -226,6 +227,11 @@ import type { Schema } from "../amplify/data/resource";
 import AppLayout from "@cloudscape-design/components/app-layout";
 import Table from "@cloudscape-design/components/table";
 import Pagination from "@cloudscape-design/components/pagination";
+import TextFilter from "@cloudscape-design/components/text-filter";
+import Textarea from "@cloudscape-design/components/textarea";
+
+// Collection hooks — filtering, pagination, selection for client-side tables
+import { useCollection } from "@cloudscape-design/collection-hooks";
 
 // Routing — package is "react-router" (v7); react-router-dom no longer exists
 import { Route, Routes, useNavigate, useLocation } from "react-router";
@@ -236,27 +242,43 @@ import { useAuthenticator } from "@aws-amplify/ui-react";
 
 // Src imports use the @/* alias
 import App from "@/App";
+import { formatDuration, todayDateStr, minutesToMaxDuration, maxDurationToMinutes } from "@/utils/duration";
 ```
 
 ## UI Conventions
 
-### Tables
+### Tables — `useCollection` pattern
 
-All Cloudscape `<Table>` components use client-side pagination with **10 items per page** (`PAGE_SIZE = 10`). Every page component that renders a table must:
+All tables use `useCollection` from `@cloudscape-design/collection-hooks` for client-side filtering, pagination, and selection. The hook wires up three components at once and resets pagination automatically when items change.
 
-1. Hold `const [currentPage, setCurrentPage] = useState(1)` and `const PAGE_SIZE = 10`.
-2. Slice the data: `items={rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)}`.
-3. Add the `pagination` prop:
-   ```tsx
-   pagination={
-     <Pagination
-       currentPageIndex={currentPage}
-       pagesCount={Math.max(1, Math.ceil(rows.length / PAGE_SIZE))}
-       onChange={({ detail }) => setCurrentPage(detail.currentPageIndex)}
-     />
-   }
-   ```
-4. Reset to page 1 (`setCurrentPage(1)`) whenever the data array is replaced (after load or mutation).
+```typescript
+import { useCollection } from "@cloudscape-design/collection-hooks";
+import TextFilter from "@cloudscape-design/components/text-filter";
+
+const PAGE_SIZE = 10;
+
+const { items, filterProps, paginationProps, collectionProps, actions, filteredItemsCount } =
+  useCollection(allItems, {
+    filtering: {
+      filteringFunction: (item, text) => item.name.toLowerCase().includes(text.toLowerCase()),
+      empty: <Box>No items found</Box>,
+      noMatch: <Box>No matches</Box>,
+    },
+    pagination: { pageSize: PAGE_SIZE },
+    selection: { trackBy: "id" },
+  });
+
+// In JSX:
+// <Table {...collectionProps} items={items} selectionType="single" filter={<TextFilter {...filterProps} />} pagination={<Pagination {...paginationProps} />} />
+```
+
+- `collectionProps` — spread onto `<Table>`: handles selection, empty state, ref
+- `filterProps` — spread onto `<TextFilter>`: manages `filteringText` and `onChange`
+- `paginationProps` — spread onto `<Pagination>`: manages page index, count, onChange
+- `actions.setSelectedItems([])` — clears selection (use after mutations instead of `setSelectedItems`)
+- `actions.setCurrentPage(1)` — resets page (use after fetching fresh data)
+
+**Duration display:** always use `formatDuration(minutes)` from `@/utils/duration` — never raw minutes. Displays as `45min`, `8h 30min`, or `2d 8h`.
 
 ## Code Style
 
