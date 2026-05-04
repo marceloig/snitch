@@ -173,7 +173,7 @@ describe("RequestAccessPage", () => {
       expect(screen.getByText("AWS Account")).toBeInTheDocument();
       // Use getAllByText because the table column header also says "Permission Set"
       expect(screen.getAllByText("Permission Set").length).toBeGreaterThanOrEqual(1);
-      expect(screen.getByText("Duration")).toBeInTheDocument();
+      expect(screen.getAllByText("Duration").length).toBeGreaterThan(0);
       expect(screen.getByText("Justification")).toBeInTheDocument();
     });
 

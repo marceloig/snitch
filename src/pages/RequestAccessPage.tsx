@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import type { SelectProps } from "@cloudscape-design/components/select";
+import { formatDuration } from "@/utils/duration";
 
 import Alert from "@cloudscape-design/components/alert";
 import Box from "@cloudscape-design/components/box";
@@ -262,10 +263,7 @@ export function RequestAccessPage() {
         permittedEntry?.maxDurationMinutes != null &&
         requestedMinutes > permittedEntry.maxDurationMinutes
       ) {
-        const maxH = Math.floor(permittedEntry.maxDurationMinutes / 60);
-        const maxM = permittedEntry.maxDurationMinutes % 60;
-        const maxLabel = `${String(maxH).padStart(2, "0")}:${String(maxM).padStart(2, "0")}`;
-        errors.durationMinutes = `Duration exceeds the policy limit of ${maxLabel} (hh:mm).`;
+        errors.durationMinutes = `Duration exceeds the policy limit of ${formatDuration(permittedEntry.maxDurationMinutes)}.`;
         valid = false;
       }
     }
@@ -383,8 +381,8 @@ export function RequestAccessPage() {
             },
             {
               id: "durationMinutes",
-              header: "Duration (min)",
-              cell: (item) => item.durationMinutes,
+              header: "Duration",
+              cell: (item) => formatDuration(item.durationMinutes),
               width: 120,
             },
             {

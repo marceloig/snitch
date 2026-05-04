@@ -3,6 +3,8 @@ import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import type { SelectProps } from "@cloudscape-design/components/select";
 import type { StatusIndicatorProps } from "@cloudscape-design/components/status-indicator";
+import { useCollection } from "@cloudscape-design/collection-hooks";
+import { formatDuration } from "@/utils/duration";
 
 import Alert from "@cloudscape-design/components/alert";
 import Box from "@cloudscape-design/components/box";
@@ -16,6 +18,7 @@ import SpaceBetween from "@cloudscape-design/components/space-between";
 import StatusIndicator from "@cloudscape-design/components/status-indicator";
 import Table from "@cloudscape-design/components/table";
 import TextContent from "@cloudscape-design/components/text-content";
+import TextFilter from "@cloudscape-design/components/text-filter";
 
 const client = generateClient<Schema>();
 
@@ -87,11 +90,9 @@ export function ElevatedAccessPage() {
   const [allRequests, setAllRequests] = useState<AccessRequestRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
-  const [selectedItems, setSelectedItems] = useState<AccessRequestRow[]>([]);
   const [statusFilter, setStatusFilter] = useState<SelectProps.Option>(
     STATUS_FILTER_OPTIONS[0]
   );
-  const [currentPage, setCurrentPage] = useState(1);
   const [revokeModalOpen, setRevokeModalOpen] = useState(false);
   const [revoking, setRevoking] = useState(false);
   const [revokeError, setRevokeError] = useState("");
@@ -109,7 +110,6 @@ export function ElevatedAccessPage() {
           .filter((r): r is NonNullable<RawItem> => r !== null)
           .map(toRow)
       );
-      setCurrentPage(1);
     } catch (err) {
       setLoadError(
         err instanceof Error ? err.message : "Failed to load access requests"
@@ -123,39 +123,59 @@ export function ElevatedAccessPage() {
     loadRequests();
   }, [loadRequests]);
 
-  const filteredRequests = statusFilter.value
+  // Status dropdown is applied before the collection hook so text filter
+  // and pagination always operate on the already-status-filtered set.
+  const filteredByStatus = statusFilter.value
     ? allRequests.filter((r) => r.status === statusFilter.value)
     : allRequests;
 
-  const visibleRequests = filteredRequests.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
-  );
+  const { items, filterProps, paginationProps, collectionProps, actions, filteredItemsCount } =
+    useCollection(filteredByStatus, {
+      filtering: {
+        filteringFunction: (item, text) => {
+          const q = text.toLowerCase();
+          return (
+            item.userLabel.toLowerCase().includes(q) ||
+            item.accountId.toLowerCase().includes(q) ||
+            item.permissionSetName.toLowerCase().includes(q)
+          );
+        },
+        empty: (
+          <Box textAlign="center" color="inherit">
+            No access requests found
+          </Box>
+        ),
+        noMatch: (
+          <Box textAlign="center" color="inherit">
+            No matches for the current filter
+          </Box>
+        ),
+      },
+      pagination: { pageSize: PAGE_SIZE },
+      selection: { trackBy: "id" },
+    });
 
-  function handleFilterChange(option: SelectProps.Option) {
+  const selected = (collectionProps.selectedItems as AccessRequestRow[])?.[0];
+  const canRevoke = selected?.status === "ACTIVE";
+
+  function handleStatusFilterChange(option: SelectProps.Option) {
     setStatusFilter(option);
-    setCurrentPage(1);
-    setSelectedItems([]);
+    actions.setSelectedItems([]);
   }
 
   async function handleRevoke() {
-    const selected = selectedItems[0];
     if (!selected) return;
     setRevoking(true);
     setRevokeError("");
     try {
-      const res = await client.mutations.revokeAccess({
-        requestId: selected.id,
-      });
+      const res = await client.mutations.revokeAccess({ requestId: selected.id });
       if (res.errors?.length) {
         throw new Error(res.errors.map((e) => e.message).join("; "));
       }
       setRevokeModalOpen(false);
-      setSelectedItems([]);
+      actions.setSelectedItems([]);
       setAllRequests((prev) =>
-        prev.map((r) =>
-          r.id === selected.id ? { ...r, status: "REVOKED" } : r
-        )
+        prev.map((r) => (r.id === selected.id ? { ...r, status: "REVOKED" } : r))
       );
     } catch (err) {
       setRevokeError(
@@ -166,8 +186,9 @@ export function ElevatedAccessPage() {
     }
   }
 
-  const selected = selectedItems[0];
-  const canRevoke = selected?.status === "ACTIVE";
+  const counterText = filterProps.filteringText
+    ? `(${filteredItemsCount} / ${filteredByStatus.length})`
+    : `(${filteredByStatus.length})`;
 
   return (
     <ContentLayout header={<Header variant="h1">Elevated Access</Header>}>
@@ -175,15 +196,11 @@ export function ElevatedAccessPage() {
         {loadError && <Alert type="error">{loadError}</Alert>}
 
         <Table
+          {...collectionProps}
           loading={loading}
           loadingText="Loading access requests"
-          items={visibleRequests}
-          selectedItems={selectedItems}
-          onSelectionChange={({ detail }) =>
-            setSelectedItems(detail.selectedItems)
-          }
+          items={items}
           selectionType="single"
-          trackBy="id"
           columnDefinitions={[
             {
               id: "user",
@@ -213,8 +230,8 @@ export function ElevatedAccessPage() {
             },
             {
               id: "duration",
-              header: "Duration (min)",
-              cell: (r) => r.durationMinutes,
+              header: "Duration",
+              cell: (r) => formatDuration(r.durationMinutes),
               width: 140,
             },
             {
@@ -223,19 +240,32 @@ export function ElevatedAccessPage() {
               cell: (r) => r.createdAt,
             },
           ]}
+          filter={
+            <SpaceBetween direction="horizontal" size="xs">
+              <TextFilter
+                {...filterProps}
+                filteringPlaceholder="Find by user, account or permission set"
+                countText={
+                  filteredItemsCount !== undefined
+                    ? `${filteredItemsCount} match${filteredItemsCount !== 1 ? "es" : ""}`
+                    : undefined
+                }
+              />
+              <Select
+                selectedOption={statusFilter}
+                onChange={({ detail }) =>
+                  handleStatusFilterChange(detail.selectedOption)
+                }
+                options={STATUS_FILTER_OPTIONS}
+              />
+            </SpaceBetween>
+          }
           header={
             <Header
               variant="h2"
-              counter={`(${filteredRequests.length})`}
+              counter={counterText}
               actions={
                 <SpaceBetween direction="horizontal" size="xs">
-                  <Select
-                    selectedOption={statusFilter}
-                    onChange={({ detail }) =>
-                      handleFilterChange(detail.selectedOption)
-                    }
-                    options={STATUS_FILTER_OPTIONS}
-                  />
                   <Button
                     iconName="refresh"
                     loading={loading}
@@ -259,23 +289,7 @@ export function ElevatedAccessPage() {
               All Access Requests
             </Header>
           }
-          pagination={
-            <Pagination
-              currentPageIndex={currentPage}
-              pagesCount={Math.max(
-                1,
-                Math.ceil(filteredRequests.length / PAGE_SIZE)
-              )}
-              onChange={({ detail }) =>
-                setCurrentPage(detail.currentPageIndex)
-              }
-            />
-          }
-          empty={
-            <Box textAlign="center" color="inherit">
-              No access requests found
-            </Box>
-          }
+          pagination={<Pagination {...paginationProps} />}
         />
 
         <Modal
@@ -318,7 +332,7 @@ export function ElevatedAccessPage() {
                   <br />
                   <strong>Permission Set:</strong> {selected.permissionSetName}
                   <br />
-                  <strong>Duration:</strong> {selected.durationMinutes} minutes
+                  <strong>Duration:</strong> {formatDuration(selected.durationMinutes)}
                   <br />
                   <strong>Requested at:</strong> {selected.createdAt}
                 </p>
