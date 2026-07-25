@@ -50,8 +50,10 @@ Snitch needs a SAML 2.0 application in IAM Identity Center so your workforce can
 Pick a prefix for the Cognito sign-in domain. It must be **globally unique across all AWS accounts** in the Region, so choose something specific to your organization — a value that is already taken will cause the deploy to fail. It forms the sign-in URL and the SAML **Assertion Consumer Service (ACS) URL** you register in IDC:
 
 ```
-https://<COGNITO_DOMAIN_PREFIX>.auth.<REGION>.amazoncognito.com/saml2/idpresponse
+https://snitch-example.auth.us-east-1.amazoncognito.com/saml2/idpresponse
 ```
+
+Replace `snitch-example` with your chosen prefix and `us-east-1` with your deployment Region.
 
 {: .note }
 In an Amplify Hosting deployment this prefix is generated automatically as `snitch-<branch>-<app-id>`, so use that form for the ACS URL once you know your Amplify app id (or register a placeholder and update it after the first deploy).
@@ -64,7 +66,7 @@ In an Amplify Hosting deployment this prefix is generated automatically as `snit
 
    | Field | Value |
    |---|---|
-   | **Application ACS URL** | `https://<COGNITO_DOMAIN_PREFIX>.auth.<REGION>.amazoncognito.com/saml2/idpresponse` (you'll finalize this after the first deploy in Step 3, once the real domain exists) |
+   | **Application ACS URL** | `https://snitch-example.auth.us-east-1.amazoncognito.com/saml2/idpresponse` (substitute your prefix and Region; you'll finalize this after the first deploy in Step 3, once the real domain exists) |
    | **Application SAML audience** | `urn:amazon:cognito:sp:placeholder` (you'll update this after the first deploy in Step 3) |
 
 4. Under **Attribute mappings**, add the email mapping so Cognito receives each user's address:
@@ -139,10 +141,10 @@ The Cognito **domain prefix** and **User Pool ID** only exist after the first de
 2. Edit **Application metadata → Application ACS URL** and set it to the real Cognito domain:
 
    ```
-   https://<COGNITO_DOMAIN_PREFIX>.auth.<REGION>.amazoncognito.com/saml2/idpresponse
+   https://snitch-example.auth.us-east-1.amazoncognito.com/saml2/idpresponse
    ```
 
-   (In Amplify Hosting the prefix is `snitch-<branch>-<app-id>`.)
+   (Substitute your real prefix and Region. In Amplify Hosting the prefix is `snitch-<branch>-<app-id>`.)
 3. Edit **Application metadata → Application SAML audience** and set it to:
 
    ```
