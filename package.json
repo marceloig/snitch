@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@aws-amplify/ui-react": "^6.15.3",
+    "@aws-crypto/sha256-js": "5.2.0",
     "@aws-sdk/client-cognito-identity-provider": "3.840.0",
     "@aws-sdk/client-identitystore": "^3.840.0",
     "@aws-sdk/client-lambda": "^3.1045.0",
@@ -27,6 +28,8 @@
     "@cloudscape-design/components": "^3.0.1287",
     "@cloudscape-design/design-tokens": "^3.0.84",
     "@cloudscape-design/global-styles": "^1.0.58",
+    "@smithy/protocol-http": "5.3.14",
+    "@smithy/signature-v4": "5.6.4",
     "aws-amplify": "^6.16.4",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",

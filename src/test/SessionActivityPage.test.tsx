@@ -1,17 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-const { mockListAllAccessRequests, mockGetCloudTrailLogs } = vi.hoisted(() => ({
-  mockListAllAccessRequests: vi.fn(),
-  mockGetCloudTrailLogs: vi.fn(),
-}));
+const { mockListAllAccessRequests, mockGetCloudTrailLogs, statusChangeListeners } =
+  vi.hoisted(() => ({
+    mockListAllAccessRequests: vi.fn(),
+    mockGetCloudTrailLogs: vi.fn(),
+    // Captures the page's onAccessRequestStatusChanged handler so tests can fire
+    // the stream-backed event that the real backend publishes.
+    statusChangeListeners: [] as Array<() => void>,
+  }));
 
 vi.mock("aws-amplify/data", () => ({
   generateClient: () => ({
     queries: {
       listAllAccessRequests: mockListAllAccessRequests,
       getCloudTrailLogs: mockGetCloudTrailLogs,
+    },
+    subscriptions: {
+      onAccessRequestStatusChanged: () => ({
+        subscribe: ({ next }: { next: () => void }) => {
+          statusChangeListeners.push(next);
+          return { unsubscribe: vi.fn() };
+        },
+      }),
     },
   }),
 }));
@@ -71,10 +83,43 @@ const CLOUDTRAIL_EVENT = {
   readOnly: true,
 };
 
+/** Simulates the AppSync event published by the AccessRequestTable stream. */
+function emitStatusChange(): void {
+  act(() => {
+    statusChangeListeners.forEach((next) => next());
+  });
+}
+
 describe("SessionActivityPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    statusChangeListeners.length = 0;
     mockGetCloudTrailLogs.mockResolvedValue({ data: [], errors: undefined });
+  });
+
+  // A session only becomes visible here once assignPermissionSet writes
+  // activatedAt, which no mutation broadcasts — the stream event is the signal.
+  it("picks up a session that turns ACTIVE after a status-change event", async () => {
+    const activeSession = {
+      ...SESSION,
+      status: "ACTIVE",
+      deactivatedAt: "",
+    };
+    mockListAllAccessRequests
+      .mockResolvedValueOnce({ data: [NO_SESSION], errors: undefined })
+      .mockResolvedValue({ data: [activeSession], errors: undefined });
+
+    render(<SessionActivityPage />);
+    await waitFor(() =>
+      expect(screen.queryByText("alice@example.com")).not.toBeInTheDocument()
+    );
+
+    emitStatusChange();
+
+    await waitFor(() =>
+      expect(screen.getByText("alice@example.com")).toBeInTheDocument()
+    );
+    expect(screen.getByText("ACTIVE")).toBeInTheDocument();
   });
 
   it("lists only requests that started a real session (activatedAt present)", async () => {

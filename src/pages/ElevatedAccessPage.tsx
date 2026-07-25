@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import type { SelectProps } from "@cloudscape-design/components/select";
@@ -45,6 +45,36 @@ const STATUS_FILTER_OPTIONS: SelectProps.Option[] = [
   ...ALL_STATUSES.map((s) => ({ label: s, value: s })),
 ];
 
+const TERMINAL_STATUSES = new Set(["EXPIRED", "REVOKED", "REJECTED", "FAILED"]);
+
+/**
+ * Keeps rows revoked in this session displayed as REVOKED until the backend
+ * catches up. revokeAccess only signals the state machine — RemovePermissionSet
+ * writes REVOKED seconds later — so a refetch triggered right after the mutation
+ * still reads ACTIVE and would otherwise flip the row back.
+ *
+ * Ids are dropped from the set as soon as a refetch reports a terminal status,
+ * which the DynamoDB stream (onAccessRequestStatusChanged) makes happen within
+ * about a second of the real write.
+ *
+ * @example
+ *   setAllRequests(overlayPendingRevocations(rows, pendingRevokedIdsRef.current));
+ */
+function overlayPendingRevocations(
+  rows: AccessRequestRow[],
+  pendingRevokedIds: Set<string>
+): AccessRequestRow[] {
+  if (pendingRevokedIds.size === 0) return rows;
+  return rows.map((r) => {
+    if (!pendingRevokedIds.has(r.id)) return r;
+    if (TERMINAL_STATUSES.has(r.status)) {
+      pendingRevokedIds.delete(r.id);
+      return r;
+    }
+    return { ...r, status: "REVOKED" };
+  });
+}
+
 export function ElevatedAccessPage() {
   const [allRequests, setAllRequests] = useState<AccessRequestRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -58,6 +88,8 @@ export function ElevatedAccessPage() {
   const [revokeError, setRevokeError] = useState("");
   const [revokeComment, setRevokeComment] = useState("");
 
+  const pendingRevokedIdsRef = useRef<Set<string>>(new Set());
+
   const loadRequests = useCallback(async () => {
     setLoading(true);
     setLoadError("");
@@ -66,7 +98,9 @@ export function ElevatedAccessPage() {
       if (res.errors?.length) {
         throw new Error(res.errors.map((e) => e.message).join("; "));
       }
-      setAllRequests(toRows(res.data));
+      setAllRequests(
+        overlayPendingRevocations(toRows(res.data), pendingRevokedIdsRef.current)
+      );
     } catch (err) {
       setLoadError(
         err instanceof Error ? err.message : "Failed to load access requests"
@@ -86,6 +120,12 @@ export function ElevatedAccessPage() {
       client.subscriptions.onAccessRequestApproved().subscribe({ next: () => void loadRequests() }),
       client.subscriptions.onAccessRequestRejected().subscribe({ next: () => void loadRequests() }),
       client.subscriptions.onAccessRequestRevoked().subscribe({ next: () => void loadRequests() }),
+      // Backed by the AccessRequestTable stream, so it also covers the status
+      // writes no mutation can broadcast: natural expiry, the 24h approval
+      // timeout, FAILED, and the delayed REVOKED from RemovePermissionSet.
+      client.subscriptions
+        .onAccessRequestStatusChanged()
+        .subscribe({ next: () => void loadRequests() }),
     ];
     return () => subs.forEach((s) => s.unsubscribe());
   }, [loadRequests]);
@@ -145,10 +185,14 @@ export function ElevatedAccessPage() {
       setRevokeModalOpen(false);
       setRevokeComment("");
       actions.setSelectedItems([]);
+      const comment = revokeComment.trim();
+      // Optimistic until the stream event lands; the id in pendingRevokedIds
+      // keeps interleaved refetches from showing ACTIVE again in the meantime.
+      pendingRevokedIdsRef.current.add(selected.id);
       setAllRequests((prev) =>
         prev.map((r) =>
           r.id === selected.id
-            ? { ...r, status: "REVOKED", revokeComment: revokeComment.trim() }
+            ? { ...r, status: "REVOKED", revokeComment: comment }
             : r
         )
       );

@@ -16,3 +16,5 @@ There are two auditor pages:
 
 - **[Approval History]({% link pages/approval-history.md %})** — every approval-required request and how it was decided.
 - **[Session Activity]({% link pages/session-activity.md %})** — every real elevated-access session and its CloudTrail event log.
+
+Both pages update themselves as access activity happens, so a reviewer can leave one open and watch decisions and sessions land in real time. Being read-only is unaffected: the live update only tells the page to re-run the same read it does on load.

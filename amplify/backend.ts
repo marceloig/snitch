@@ -8,6 +8,7 @@ import { setupAWSResourceFunctions } from "./awsResourceFunctions";
 import { setupPolicyStore } from "./policyStore";
 import { setupAppSettings } from "./appSettings";
 import { setupAccessRequestHandlers } from "./accessRequestHandlers";
+import { setupAccessRequestStatusStream } from "./accessRequestStatusStream";
 import { setupSlackHandler } from "./slackHandler";
 import { auth } from "./auth/resource";
 import { data } from "./data/resource";
@@ -42,6 +43,7 @@ import {
   listAllAccessRequestsFunction,
   revokeAccessFunction,
   getCloudTrailLogsFunction,
+  publishRequestStatusChangeFunction,
 } from "./functions/accessRequests/resource";
 import { getSettingsFunction, updateSettingsFunction } from "./functions/settings/resource";
 import { slackInteractiveFunction } from "./functions/slackInteractions/resource";
@@ -80,6 +82,7 @@ const backend = defineBackend({
   listAllAccessRequestsFunction,
   revokeAccessFunction,
   getCloudTrailLogsFunction,
+  publishRequestStatusChangeFunction,
   getSettingsFunction,
   updateSettingsFunction,
   slackInteractiveFunction,
@@ -129,8 +132,19 @@ const { policyStoreArn, policyStoreId } = setupPolicyStore({
   evaluateAccessFn: backend.evaluateAccessFunction.resources.lambda,
 });
 
-const { accessRequestTableArn, accessRequestTableName, notificationsTopicArn } =
-  setupAccessRequestWorkflow(backend);
+const {
+  accessRequestTableArn,
+  accessRequestTableName,
+  accessRequestTableStreamArn,
+  notificationsTopicArn,
+} = setupAccessRequestWorkflow(backend);
+
+setupAccessRequestStatusStream({
+  publishRequestStatusChangeFn: backend.publishRequestStatusChangeFunction.resources.lambda,
+  accessRequestTableStreamArn,
+  graphqlApiArn: backend.data.resources.graphqlApi.arn,
+  graphqlUrl: backend.data.resources.cfnResources.cfnGraphqlApi.attrGraphQlUrl,
+});
 
 const appSettingsTable = setupAppSettings({
   settingsStack: backend.createStack("AppSettingsStack"),

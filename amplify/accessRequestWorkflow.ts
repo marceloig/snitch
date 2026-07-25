@@ -1,7 +1,7 @@
 import { Stack, RemovalPolicy } from "aws-cdk-lib";
 import { Effect, PolicyDocument, PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Function as LambdaFunction, IFunction } from "aws-cdk-lib/aws-lambda";
-import { AttributeType, BillingMode, Table } from "aws-cdk-lib/aws-dynamodb";
+import { AttributeType, BillingMode, StreamViewType, Table } from "aws-cdk-lib/aws-dynamodb";
 import { CfnStateMachine } from "aws-cdk-lib/aws-stepfunctions";
 import { Topic } from "aws-cdk-lib/aws-sns";
 
@@ -18,6 +18,7 @@ interface AccessRequestResources {
 export type AccessRequestWorkflowOutputs = {
   accessRequestTableArn: string;
   accessRequestTableName: string;
+  accessRequestTableStreamArn: string;
   notificationsTopicArn: string;
 };
 
@@ -41,6 +42,11 @@ export function setupAccessRequestWorkflow(
     partitionKey: { name: "id", type: AttributeType.STRING },
     billingMode: BillingMode.PAY_PER_REQUEST,
     removalPolicy: RemovalPolicy.RETAIN,
+    // Feeds publishRequestStatusChange, which republishes status transitions to
+    // AppSync so the UI updates without polling. NEW_AND_OLD_IMAGES is required:
+    // the publisher compares old vs new status to ignore the frequent writes
+    // that touch only taskToken / revokeComment / timestamps.
+    stream: StreamViewType.NEW_AND_OLD_IMAGES,
   });
 
   accessRequestTable.addGlobalSecondaryIndex({
@@ -423,6 +429,9 @@ export function setupAccessRequestWorkflow(
   return {
     accessRequestTableArn: accessRequestTable.tableArn,
     accessRequestTableName: accessRequestTable.tableName,
+    // Only the ARN crosses stacks — never the Table construct — so the
+    // dependency stays data → AccessRequestWorkflow with no cycle.
+    accessRequestTableStreamArn: accessRequestTable.tableStreamArn!,
     notificationsTopicArn: notificationsTopic.topicArn,
   };
 }

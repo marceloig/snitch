@@ -39,6 +39,12 @@ DynamoDB      Lambda Resolvers              Step Functions
    ▼
 AWS Verified Permissions
 (Cedar policy store — authoritative for all access decisions)
+
+DynamoDB Streams (AccessRequestTable)
+   │
+   ▼
+publishRequestStatusChange ──► AppSync subscription ──► Browser
+(live status updates, see below)
 ```
 
 ---
@@ -60,7 +66,7 @@ AppSync resolvers reference Lambda ARNs. If approval/revocation Lambdas lived in
 - `data` → `AccessRequestWorkflow` (AppSync references Lambda ARNs)
 - `AccessRequestWorkflow` → `data` (needs `PrivilegedPolicyTable` ARN for IAM)
 
-The split breaks the cycle: `AccessRequestWorkflow` exposes `{ accessRequestTableArn, accessRequestTableName }` and `data` (`backend.ts`) imports them — a single direction CloudFormation can resolve.
+The split breaks the cycle: `AccessRequestWorkflow` exposes `{ accessRequestTableArn, accessRequestTableName, accessRequestTableStreamArn, notificationsTopicArn }` and `data` (`backend.ts`) imports them — a single direction CloudFormation can resolve.
 
 ---
 
@@ -97,6 +103,7 @@ All IAM `PolicyStatement` additions live in `amplify/backend.ts`. Lambda functio
 |---|---|
 | Handler called directly by AppSync (query/mutation) | `resourceGroupName: "data"` |
 | Handler called by the Step Functions state machine | `resourceGroupName: "AccessRequestWorkflow"` |
+| Handler that *calls* AppSync (needs the GraphQL endpoint) | `resourceGroupName: "data"` |
 
 ### Current Split
 
@@ -107,6 +114,33 @@ All IAM `PolicyStatement` additions live in `amplify/backend.ts`. Lambda functio
 | `listAllAccessRequests`, `revokeAccess` | |
 | `createApprovalPolicy`, `deleteApprovalPolicy` | |
 | `getSettings`, `updateSettings`, `getCloudTrailLogs` | |
+| `publishRequestStatusChange` (DynamoDB stream consumer) | |
+
+---
+
+## Live Status Updates
+
+Request tables in the UI update themselves — no polling, no manual refresh. The mechanism has two halves, because AppSync subscriptions can only be linked to a mutation (`.for(a.ref("<mutation>"))`) and therefore only fire when a **client** calls that mutation:
+
+1. **Client-driven changes** are broadcast by the mutation itself: `onAccessRequestCreated`, `onAccessRequestApproved`, `onAccessRequestRejected`, `onAccessRequestRevoked`.
+2. **Workflow-driven changes** have no client mutation to hook into — natural expiry and revocation are written by `removePermissionSetHandler` seconds *after* `revokeAccess` returns, the 24-hour approval timeout (`SetStatusExpired`) and `SetStatusScheduled` are Step Functions DynamoDB SDK integrations with no Lambda at all, and `FAILED` comes from `setStatusFailedHandler`. A DynamoDB stream on `AccessRequestTable` is the one channel that observes all of them.
+
+```
+AccessRequestTable (stream: NEW_AND_OLD_IMAGES)
+  └─ EventSourceMapping (filter eventName = MODIFY, batch 10, 1s window)
+       └─ publishRequestStatusChange  [data stack]
+            └─ mutation publishAccessRequestStatus  (passthrough resolver, NONE data source)
+                 └─ subscription onAccessRequestStatusChanged
+                      └─ Elevated Access, Approval History, Session Activity → refetch
+```
+
+Wired in `amplify/accessRequestStatusStream.ts`. Design points:
+
+- **The consumer belongs to the `data` stack.** It needs the stream ARN (from `AccessRequestWorkflow`) *and* the GraphQL endpoint (from `data`); placing it in `data` keeps both references pointing `data → AccessRequestWorkflow`. Only the stream **ARN** crosses stacks, never the `Table` construct.
+- **Authorization is IAM.** Amplify always configures the API with `enableIamAuthorizationMode`, and IAM principals bypass `@auth` rules — so the publisher is authorized purely by an `appsync:GraphQL` grant scoped to the single `publishAccessRequestStatus` field.
+- **The event payload is deliberately thin** (`requestId`, `status`, `updatedAt`). Subscribers react by refetching through their own authorized query, so no requester email, account, or justification ever travels over a subscription.
+- **The consumer never throws.** A throw would retry the whole batch and stall the stream shard. It also skips records whose status did not change — most writes to the table only touch `taskToken`, `revokeComment`, or timestamps.
+- **Push is best-effort.** Pages still load on mount and offer Refresh; the subscription is an optimization, never the only path to correct data.
 
 ---
 
@@ -148,6 +182,7 @@ snitch/
 │   ├── backend.ts                    # CDK wiring: SAML/OAuth escape hatch, managed login
 │   │                                 # branding, AVP policy store, IAM grants, env vars
 │   ├── accessRequestWorkflow.ts      # Step Functions state machine + AccessRequestTable
+│   ├── accessRequestStatusStream.ts  # DynamoDB stream → AppSync live status updates
 │   └── functions/
 │       ├── auth/                     # Pre-token generation Lambda (injects IDC groups)
 │       ├── awsResources/             # Lambda resolvers: IDC, Organizations, SSO Admin

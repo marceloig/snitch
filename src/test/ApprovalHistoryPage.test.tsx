@@ -1,17 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-const { mockListAllAccessRequests, mockGetCloudTrailLogs } = vi.hoisted(() => ({
-  mockListAllAccessRequests: vi.fn(),
-  mockGetCloudTrailLogs: vi.fn(),
-}));
+const { mockListAllAccessRequests, mockGetCloudTrailLogs, statusChangeListeners } =
+  vi.hoisted(() => ({
+    mockListAllAccessRequests: vi.fn(),
+    mockGetCloudTrailLogs: vi.fn(),
+    // Captures the page's onAccessRequestStatusChanged handler so tests can fire
+    // the stream-backed event that the real backend publishes.
+    statusChangeListeners: [] as Array<() => void>,
+  }));
 
 vi.mock("aws-amplify/data", () => ({
   generateClient: () => ({
     queries: {
       listAllAccessRequests: mockListAllAccessRequests,
       getCloudTrailLogs: mockGetCloudTrailLogs,
+    },
+    subscriptions: {
+      onAccessRequestStatusChanged: () => ({
+        subscribe: ({ next }: { next: () => void }) => {
+          statusChangeListeners.push(next);
+          return { unsubscribe: vi.fn() };
+        },
+      }),
     },
   }),
 }));
@@ -63,10 +75,51 @@ const NO_APPROVAL = {
   requiresApproval: false,
 };
 
+/** Simulates the AppSync event published by the AccessRequestTable stream. */
+function emitStatusChange(): void {
+  act(() => {
+    statusChangeListeners.forEach((next) => next());
+  });
+}
+
 describe("ApprovalHistoryPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    statusChangeListeners.length = 0;
     mockGetCloudTrailLogs.mockResolvedValue({ data: [], errors: undefined });
+  });
+
+  it("reloads when a status-change event arrives", async () => {
+    const awaitingDecision = {
+      ...APPROVED,
+      status: "PENDING_APPROVAL",
+      approvedBy: "",
+      approverComment: "",
+      decidedAt: "",
+    };
+    mockListAllAccessRequests
+      .mockResolvedValueOnce({ data: [awaitingDecision], errors: undefined })
+      .mockResolvedValue({
+        data: [
+          {
+            ...awaitingDecision,
+            status: "REJECTED",
+            approvedBy: "approver@example.com",
+            approverComment: "not now",
+          },
+        ],
+        errors: undefined,
+      });
+
+    render(<ApprovalHistoryPage />);
+    await waitFor(() =>
+      expect(screen.getByText("PENDING_APPROVAL")).toBeInTheDocument()
+    );
+
+    emitStatusChange();
+
+    await waitFor(() => expect(screen.getByText("REJECTED")).toBeInTheDocument());
+    expect(screen.getByText("not now")).toBeInTheDocument();
   });
 
   it("lists only requests that required approval", async () => {

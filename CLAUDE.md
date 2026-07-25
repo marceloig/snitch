@@ -48,6 +48,9 @@ snitch/
 │   ├── auth/resource.ts        # Cognito config; email login + pre-token generation trigger
 │   ├── authConfig.ts           # REMOVED — synth-time Cognito values now come from environment variables
 │   ├── data/resource.ts        # AppSync schema: PrivilegedPolicy model + AVP-backed mutations
+│   ├── data/subscriptionHandler.js     # Passthrough JS resolver for every subscription
+│   ├── data/publishStatusResolver.js   # Passthrough mutation resolver (NONE data source) for publishAccessRequestStatus
+│   ├── accessRequestStatusStream.ts    # DDB stream → publishRequestStatusChange wiring (event source mapping, IAM, env)
 │   ├── backend.ts              # CDK wiring: SAML/OAuth CDK escape hatch, AVP policy store,
 │   │                           # AppSettingsTable, IAM grants, env vars
 │   └── functions/
@@ -191,6 +194,7 @@ AssignPermissionSet → WaitForEarlyRevocation → RemovePermissionSet
 | `listAllAccessRequestsHandler.ts` | data | Returns all requests across all users (newest first). Authorized for `Admins` (Elevated Access) **and** `Auditors` (Approval History + Session Activity) via `allow.groups(["Admins", "Auditors"])` |
 | `revokeAccessHandler.ts` | data | Signals `WaitForEarlyRevocation` via `SendTaskSuccess`; persists optional `revokeComment` for audit |
 | `getCloudTrailLogsHandler.ts` | data | Reads configured log group from AppSettingsTable; calls CloudWatch Logs `FilterLogEvents` with email-based filter; returns parsed CloudTrail events. Authorized for `Admins` **and** `Auditors` |
+| `publishRequestStatusChangeHandler.ts` | data | DynamoDB stream consumer: republishes `AccessRequestTable` status transitions through the `publishAccessRequestStatus` mutation so `onAccessRequestStatusChanged` fires. Not an AppSync resolver — see the status-stream section in Architecture |
 
 `approveRequest`, `rejectRequest`, `listPendingApprovals`, `listAllAccessRequests`, `revokeAccess` are in the `data` stack (`resourceGroupName: "data"`) — see the Architecture section below for why.
 
@@ -298,6 +302,7 @@ permit (
 | `APP_SETTINGS_TABLE_NAME` | `getSettingsHandler`, `updateSettingsHandler`, `getCloudTrailLogsHandler`, `requestAccessHandler`, `removePermissionSetHandler`, `storeApprovalTokenHandler` |
 | `NOTIFICATIONS_TOPIC_ARN` | Notification publishers (`requestAccessHandler`, `removePermissionSetHandler`, `storeApprovalTokenHandler`); also read-only on `getSettingsHandler` to surface the ARN |
 | `APP_CALLBACK_URL` | `storeApprovalTokenHandler` — builds the SNS approval email's link to the Approve Requests page |
+| `APPSYNC_GRAPHQL_URL` | `publishRequestStatusChangeHandler` — AppSync endpoint it signs (SigV4) to call `publishAccessRequestStatus`; set in `accessRequestStatusStream.ts` from `cfnGraphqlApi.attrGraphQlUrl` |
 
 `COGNITO_DOMAIN_PREFIX` and `APP_CALLBACK_URL` are optional synth-time values resolved in `amplify/synthEnv.ts`: in an Amplify Hosting build they auto-derive from the reserved `AWS_APP_ID`/`AWS_BRANCH` vars (`snitch-<branch>-<app-id>` and `https://<branch>.<app-id>.amplifyapp.com`); a local sandbox has no app id, so `COGNITO_DOMAIN_PREFIX` auto-derives as `snitch-sandbox-<account-id>` from `CDK_DEFAULT_ACCOUNT` (the CDK-populated account id — globally unique and stable, the sandbox analog of the app-id derivation) and `APP_CALLBACK_URL` defaults to `http://localhost:5173`. Set `COGNITO_DOMAIN_PREFIX` explicitly only to choose a custom domain or run more than one sandbox in the same AWS account.
 
@@ -325,6 +330,11 @@ permit (
 **CloudTrail logs handler** (`getCloudTrailLogs`):
 - `dynamodb:GetItem` — scoped to `AppSettingsTable` (reads configured log group at runtime)
 - `logs:FilterLogEvents` — scoped to `*` (log group is dynamic; determined at runtime from settings)
+
+**Status stream publisher** (`publishRequestStatusChange`, wired in `accessRequestStatusStream.ts`):
+- `dynamodb:DescribeStream`, `GetRecords`, `GetShardIterator` — scoped to the `AccessRequestTable` stream ARN
+- `dynamodb:ListStreams` — scoped to `*` (no resource-level support)
+- `appsync:GraphQL` — scoped to `<apiArn>/types/Mutation/fields/publishAccessRequestStatus` (single field, narrower than Amplify's schema-level `types/Mutation/*` grant)
 
 ### Adding Access Evaluation
 
@@ -538,7 +548,29 @@ CheckApproval → WaitForApproval (waitForTaskToken, 24h heartbeat)
 
 `SetStatusExpired` is a Step Functions DynamoDB SDK integration state (no Lambda) — it only needs `$.requestId` from the execution context and writes `EXPIRED` directly.
 
-`setupAccessRequestWorkflow()` returns `{ accessRequestTableArn, accessRequestTableName }` so `backend.ts` can wire up the approval Lambdas (which live in a different stack) without creating a circular dependency.
+`setupAccessRequestWorkflow()` returns `{ accessRequestTableArn, accessRequestTableName, accessRequestTableStreamArn, notificationsTopicArn }` so `backend.ts` can wire up the approval Lambdas and the status stream (which live in a different stack) without creating a circular dependency.
+
+### Live status updates — DynamoDB Streams, not polling (`amplify/accessRequestStatusStream.ts`)
+
+Mutation-linked subscriptions (`.for(a.ref("<mutation>"))`) only fire when a client calls that mutation, so they can never announce a status the **workflow** writes: natural expiry and admin revocation are both written by `removePermissionSetHandler` seconds *after* `revokeAccess` returns, `SetStatusExpired`/`SetStatusScheduled` are Step Functions DynamoDB SDK integrations with no Lambda at all, and `FAILED` comes from `setStatusFailedHandler`. The `AccessRequestTable` stream is the one channel that sees all of them:
+
+```
+AccessRequestTable (stream: NEW_AND_OLD_IMAGES)
+  └─ EventSourceMapping (filter: eventName = MODIFY, batch 10, 1s window, retryAttempts 1)
+       └─ publishRequestStatusChange  [data stack]
+            └─ mutation publishAccessRequestStatus  (publishStatusResolver.js, NONE data source)
+                 └─ subscription onAccessRequestStatusChanged  → pages call loadRequests()
+```
+
+Design constraints worth keeping:
+
+- **The consumer must be in the `data` stack.** It needs the stream ARN (`AccessRequestWorkflow`) *and* the GraphQL endpoint (`data`). From `data` both references point `data → AccessRequestWorkflow`; putting it in the workflow stack would close the cycle. Only the stream **ARN** crosses stacks — never the `Table` construct.
+- **Authorization is IAM, not `@auth`.** `allow.resource()` does not exist for custom operations (only at schema level), but Amplify always configures the API with `enableIamAuthorizationMode: true`, and IAM principals bypass `@auth` rules. So the publisher is authorized purely by its `appsync:GraphQL` grant on the single mutation field. The `allow.group("Admins")` rule on `publishAccessRequestStatus` is the userPool-side restriction; a spoofed call only makes clients refetch, and the refetch reads the real DynamoDB record.
+- **The handler never throws.** A throw would retry the whole batch and stall the shard. `collectStatusChanges` (exported, unit-tested) drops records whose status did not change — most writes only touch `taskToken`/`revokeComment`/timestamps — and dedupes to the newest status per `requestId` in a batch.
+- **The payload is deliberately thin** (`requestId`, `status`, `updatedAt`). Subscribers refetch through their own authorized query, so no email/account/justification travels over a subscription. That is also what would make it safe to expose an `allow.authenticated()` variant to end users on `RequestAccessPage`.
+- Push is best-effort: pages still reconcile on mount and via Refresh. `ElevatedAccessPage` keeps an optimistic REVOKED overlay (`overlayPendingRevocations`) for the seconds between the mutation and the real write, clearing each id as soon as a refetch reports a terminal status.
+
+Subscribers: `ElevatedAccessPage` (alongside the four mutation-linked subscriptions) plus the two auditor pages, `ApprovalHistoryPage` and `SessionActivityPage`, where it is the only live wiring. Every subscriber reacts the same way — call `loadRequests()` and let the authorized query return the real record.
 
 ### AWS CLI — never run directly; always ask first
 
@@ -570,7 +602,7 @@ AppSync resolvers must be in the `data` stack (`resourceGroupName: "data"`) so A
 - `data` → `AccessRequestWorkflow` (AppSync references Lambda ARNs) **AND**
 - `AccessRequestWorkflow` → `data` (needs `PrivilegedPolicyTable` ARN for IAM)
 
-**Rule:** Any handler called directly by AppSync (queries/mutations) → `resourceGroupName: "data"`. Any handler called by the Step Functions state machine → `resourceGroupName: "AccessRequestWorkflow"`.
+**Rule:** Any handler called directly by AppSync (queries/mutations) → `resourceGroupName: "data"`. Any handler called by the Step Functions state machine → `resourceGroupName: "AccessRequestWorkflow"`. A handler that *calls* AppSync also belongs in `data` (it needs the endpoint) — see `publishRequestStatusChange`.
 
 Current split:
 
@@ -582,6 +614,7 @@ Current split:
 | `createApprovalPolicy`, `deleteApprovalPolicy` | |
 | `getSettings`, `updateSettings` | |
 | `getCloudTrailLogs` | |
+| `publishRequestStatusChange` (DDB stream consumer, not an AppSync resolver) | |
 
 IAM grants and env vars for `data`-stack functions are set in `backend.ts` using the table values returned by `setupAccessRequestWorkflow()`, creating a one-directional dependency (`data` → `AccessRequestWorkflow`) that CloudFormation can resolve.
 
@@ -597,7 +630,7 @@ The `ApproveRequestsPage` route has **no `AdminGuard`** — it is accessible to 
 
 The **Approval History** and **Session Activity** pages are wrapped in `<GroupGuard group="Auditors">` (the generalized guard `AdminGuard` now delegates to). The `Auditors` claim is minted by `preTokenGenerationHandler` from `AUDITOR_GROUP_ID`, exactly mirroring the `Admins`/`ADMIN_GROUP_ID` bridge — a user in both IDC groups receives both claims. Neither claim needs a real Cognito user-pool group; `allow.groups(["Admins", "Auditors"])` matches the injected claim string.
 
-Both pages are strictly read-only (no mutations, no subscriptions — load-on-mount + Refresh) and reuse the same data path as the admin Elevated Access page: `listAllAccessRequests` (broadened to Auditors) plus the shared `RequestDetailsModal`/`accessRequestRow` modules. Approval History filters to `requiresApproval === true` and opens the modal with `showCloudTrail={false}` (a never-activated request has no session window); Session Activity filters to rows with an `activatedAt` timestamp and opens the modal with CloudTrail logs. The `decidedAt` field on `AccessRequestItem` (written by `approveRequest`/`rejectRequest`) is the durable "Decided at" value, since `updatedAt` is overwritten once an approved request advances through the workflow.
+Both pages are strictly read-only — no mutations. They load on mount, offer Refresh, and subscribe to `onAccessRequestStatusChanged` (their only live wiring) so a decision or a session transition appears without a manual reload; see the status-stream section in Architecture. They reuse the same data path as the admin Elevated Access page: `listAllAccessRequests` (broadened to Auditors) plus the shared `RequestDetailsModal`/`accessRequestRow` modules. Approval History filters to `requiresApproval === true` and opens the modal with `showCloudTrail={false}` (a never-activated request has no session window); Session Activity filters to rows with an `activatedAt` timestamp and opens the modal with CloudTrail logs. The `decidedAt` field on `AccessRequestItem` (written by `approveRequest`/`rejectRequest`) is the durable "Decided at" value, since `updatedAt` is overwritten once an approved request advances through the workflow.
 
 **AppSync identity — access token, not ID token.** AppSync forwards the Cognito **access token** to Lambda resolvers, not the ID token. The access token's claims only include `sub`, `cognito:groups`, and standard OIDC fields — custom attributes like `email` are absent.
 

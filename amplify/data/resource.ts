@@ -140,6 +140,15 @@ const schema = a.schema({
     updatedAt: a.string(),
   }),
 
+  // Broadcast payload for AccessRequestTable status transitions. Deliberately
+  // minimal — subscribers refetch through their own authorized query, so no
+  // requester email, account or justification travels over the subscription.
+  AccessRequestStatusChange: a.customType({
+    requestId: a.string(),
+    status: a.string(),
+    updatedAt: a.string(),
+  }),
+
   // Resolves the caller's own IDC user by matching the JWT email claim.
   // Available to all authenticated users (not just Admins).
   getMyIDCUser: a
@@ -347,6 +356,23 @@ const schema = a.schema({
     .handler(a.handler.function(revokeAccessFunction))
     .authorization((allow) => [allow.group("Admins")]),
 
+  // Fan-out channel for status transitions, called only by the DynamoDB stream
+  // consumer publishRequestStatusChange. AppSync runs with
+  // enableIamAuthorizationMode, so that Lambda is authorized by its
+  // appsync:GraphQL IAM grant (IAM principals bypass @auth rules); the Admins
+  // rule below is the userPool-side restriction. A spoofed call only makes
+  // clients refetch, which reads the real record from DynamoDB.
+  publishAccessRequestStatus: a
+    .mutation()
+    .arguments({
+      requestId: a.string().required(),
+      status: a.string().required(),
+      updatedAt: a.string(),
+    })
+    .returns(a.ref("AccessRequestStatusChange"))
+    .handler(a.handler.custom({ entry: "./publishStatusResolver.js" }))
+    .authorization((allow) => [allow.group("Admins")]),
+
   // ─── App Settings ─────────────────────────────────────────────────────────
 
   AppSettings: a.customType({
@@ -440,6 +466,15 @@ const schema = a.schema({
     .for(a.ref("revokeAccess"))
     .handler(a.handler.custom({ entry: "./subscriptionHandler.js" }))
     .authorization((allow) => [allow.group("Admins")]),
+
+  // Fires on every status transition, including the ones written without a
+  // Lambda (SetStatusExpired / SetStatusScheduled) and the delayed REVOKED /
+  // EXPIRED writes from RemovePermissionSet that no mutation can broadcast.
+  onAccessRequestStatusChanged: a
+    .subscription()
+    .for(a.ref("publishAccessRequestStatus"))
+    .handler(a.handler.custom({ entry: "./subscriptionHandler.js" }))
+    .authorization((allow) => [allow.groups(["Admins", "Auditors"])]),
 
   // ─── CloudTrail audit logs ─────────────────────────────────────────────────
 

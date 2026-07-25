@@ -18,6 +18,8 @@ For each session, the page shows the requester, account, permission set, and the
 
 The audit trail relies on a CloudTrail log group being configured on the [Settings]({% link pages/settings.md %}#cloudtrail-audit-logs) page. Without it, session records still appear but their CloudTrail log is empty.
 
+The list updates on its own: a session appears as soon as access is actually granted and is marked as ended when it expires or is revoked, with no reload needed. **Refresh** is available for a manual reload.
+
 Timestamps are shown in your browser's local time.
 
 {: .note }

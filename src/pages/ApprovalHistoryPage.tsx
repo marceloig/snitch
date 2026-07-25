@@ -72,6 +72,16 @@ export function ApprovalHistoryPage() {
     loadRequests();
   }, [loadRequests]);
 
+  // Read-only page, so the stream-backed status subscription is the only live
+  // wiring: it refetches on approve/reject decisions and on the terminal
+  // transitions the workflow writes with no mutation to broadcast.
+  useEffect(() => {
+    const sub = client.subscriptions
+      .onAccessRequestStatusChanged()
+      .subscribe({ next: () => void loadRequests() });
+    return () => sub.unsubscribe();
+  }, [loadRequests]);
+
   const filteredByStatus = statusFilter.value
     ? allRequests.filter((r) => r.status === statusFilter.value)
     : allRequests;

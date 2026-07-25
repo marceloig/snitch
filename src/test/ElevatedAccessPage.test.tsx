@@ -1,14 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-const { mockListAllAccessRequests, mockRevokeAccess, mockGetCloudTrailLogs } = vi.hoisted(
-  () => ({
-    mockListAllAccessRequests: vi.fn(),
-    mockRevokeAccess: vi.fn(),
-    mockGetCloudTrailLogs: vi.fn(),
-  })
-);
+const {
+  mockListAllAccessRequests,
+  mockRevokeAccess,
+  mockGetCloudTrailLogs,
+  statusChangeListeners,
+} = vi.hoisted(() => ({
+  mockListAllAccessRequests: vi.fn(),
+  mockRevokeAccess: vi.fn(),
+  mockGetCloudTrailLogs: vi.fn(),
+  // Captures the page's onAccessRequestStatusChanged handler so tests can fire
+  // the stream-backed event that the real backend publishes.
+  statusChangeListeners: [] as Array<() => void>,
+}));
 
 vi.mock("aws-amplify/data", () => ({
   generateClient: () => ({
@@ -22,6 +28,12 @@ vi.mock("aws-amplify/data", () => ({
       onAccessRequestApproved: () => ({ subscribe: () => ({ unsubscribe: vi.fn() }) }),
       onAccessRequestRejected: () => ({ subscribe: () => ({ unsubscribe: vi.fn() }) }),
       onAccessRequestRevoked: () => ({ subscribe: () => ({ unsubscribe: vi.fn() }) }),
+      onAccessRequestStatusChanged: () => ({
+        subscribe: ({ next }: { next: () => void }) => {
+          statusChangeListeners.push(next);
+          return { unsubscribe: vi.fn() };
+        },
+      }),
     },
   }),
 }));
@@ -74,9 +86,17 @@ const CLOUDTRAIL_EVENT = {
   readOnly: true,
 };
 
+/** Simulates the AppSync event published by the AccessRequestTable stream. */
+function emitStatusChange(): void {
+  act(() => {
+    statusChangeListeners.forEach((next) => next());
+  });
+}
+
 describe("ElevatedAccessPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    statusChangeListeners.length = 0;
     mockRevokeAccess.mockResolvedValue({
       data: { ...ACTIVE_REQUEST, status: "REVOKED" },
       errors: undefined,
@@ -114,6 +134,25 @@ describe("ElevatedAccessPage", () => {
       await waitFor(() =>
         expect(screen.getByText("Unauthorized")).toBeInTheDocument()
       );
+    });
+
+    // Natural expiry is written by the Step Functions workflow, so the stream
+    // event is the only signal that reaches an open page.
+    it("reloads the table when a status-change event arrives", async () => {
+      mockListAllAccessRequests
+        .mockResolvedValueOnce({ data: [ACTIVE_REQUEST], errors: undefined })
+        .mockResolvedValue({
+          data: [{ ...ACTIVE_REQUEST, status: "EXPIRED" }],
+          errors: undefined,
+        });
+
+      render(<ElevatedAccessPage />);
+      await waitFor(() => expect(screen.getByText("ACTIVE")).toBeInTheDocument());
+
+      emitStatusChange();
+
+      await waitFor(() => expect(screen.getByText("EXPIRED")).toBeInTheDocument());
+      expect(screen.queryByText("ACTIVE")).not.toBeInTheDocument();
     });
   });
 
@@ -300,6 +339,55 @@ describe("ElevatedAccessPage", () => {
         expect(mockRevokeAccess).toHaveBeenCalledWith({ requestId: "req-1" })
       );
       await waitFor(() => expect(screen.getByText("REVOKED")).toBeInTheDocument());
+    });
+
+    it("shows the persisted record once the stream event reports the final status", async () => {
+      mockListAllAccessRequests
+        .mockResolvedValueOnce({ data: [ACTIVE_REQUEST], errors: undefined })
+        .mockResolvedValue({
+          data: [
+            {
+              ...ACTIVE_REQUEST,
+              status: "REVOKED",
+              revokeComment: "incident over",
+              deactivatedAt: "2024-01-02T10:30:00Z",
+            },
+          ],
+          errors: undefined,
+        });
+
+      render(<ElevatedAccessPage />);
+      await waitFor(() => screen.getByText("alice@example.com"));
+
+      await userEvent.click(screen.getAllByRole("radio")[0]);
+      await userEvent.click(screen.getByRole("button", { name: /revoke access/i }));
+      await userEvent.click(screen.getByRole("button", { name: /confirm revocation/i }));
+
+      // No comment was typed, so only a refetch can surface the persisted reason.
+      emitStatusChange();
+
+      await waitFor(() =>
+        expect(screen.getByText("incident over")).toBeInTheDocument()
+      );
+    });
+
+    it("keeps the row REVOKED while a refetch still returns the stale ACTIVE status", async () => {
+      render(<ElevatedAccessPage />);
+      await waitFor(() => screen.getByText("alice@example.com"));
+
+      await userEvent.click(screen.getAllByRole("radio")[0]);
+      await userEvent.click(screen.getByRole("button", { name: /revoke access/i }));
+      await userEvent.click(screen.getByRole("button", { name: /confirm revocation/i }));
+      await waitFor(() => expect(screen.getByText("REVOKED")).toBeInTheDocument());
+
+      // listAllAccessRequests still reports ACTIVE until RemovePermissionSet runs.
+      await userEvent.click(screen.getByRole("button", { name: /refresh/i }));
+
+      await waitFor(() =>
+        expect(mockListAllAccessRequests).toHaveBeenCalledTimes(2)
+      );
+      expect(screen.getByText("REVOKED")).toBeInTheDocument();
+      expect(screen.queryByText("ACTIVE")).not.toBeInTheDocument();
     });
 
     it("shows an error in the modal when the mutation fails", async () => {

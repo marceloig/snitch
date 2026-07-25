@@ -23,4 +23,6 @@ For each approval-required request, the page shows:
 
 Selecting a request opens its full details. Because an approval decision happens before any session starts, this view focuses on the request and its decision rather than session activity — for what a user actually did during a granted session, see [Session Activity]({% link pages/session-activity.md %}).
 
+The list updates on its own as decisions are made — a request left open on screen moves from *Pending approval* to its decision without a reload. **Refresh** is available for a manual reload.
+
 Timestamps are shown in your browser's local time.

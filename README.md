@@ -36,6 +36,8 @@ Admins configure which users or groups can approve requests for each AWS account
 
 Admins can view all active and historical requests across every user, revoke live access early with an optional comment, and inspect the full CloudTrail audit trail for each access window.
 
+Request tables update themselves in near real time — including status changes written by the workflow rather than by a user, such as a session expiring on its own or the 24-hour approval timeout. A DynamoDB stream on the request table republishes every status transition over an AppSync subscription, so the admin and auditor pages never need polling. See [docs/pages/architecture.md](docs/pages/architecture.md#live-status-updates).
+
 ### 6. AWS Resource Discovery
 
 When building policies, admins can browse live data from the connected AWS organization — IDC users, IDC groups, AWS accounts, Organizational Units, and Permission Sets — without leaving the app.
@@ -165,5 +167,6 @@ npm run test:coverage   # with coverage
 | Access policy store | AWS Verified Permissions | Evaluates who is allowed to access what |
 | Policy metadata | Amazon DynamoDB | Stores policy records and request history |
 | Access workflow | AWS Step Functions | Assigns and revokes permission sets automatically |
+| Live status updates | DynamoDB Streams + AWS Lambda | Republishes request status transitions over AppSync subscriptions so the UI updates without polling |
 | Notifications | Amazon SNS + Slack API | Announces requested / finished / approval events to a topic and channel |
 | Resource discovery | AWS Lambda | Fetches live data from IAM Identity Center, AWS Organizations, and SSO |

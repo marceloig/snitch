@@ -66,6 +66,15 @@ export function SessionActivityPage() {
     loadRequests();
   }, [loadRequests]);
 
+  // Read-only page, so the stream-backed status subscription is the only live
+  // wiring: a session appears when it turns ACTIVE and updates when it ends.
+  useEffect(() => {
+    const sub = client.subscriptions
+      .onAccessRequestStatusChanged()
+      .subscribe({ next: () => void loadRequests() });
+    return () => sub.unsubscribe();
+  }, [loadRequests]);
+
   const filteredByStatus = statusFilter.value
     ? allRequests.filter((r) => r.status === statusFilter.value)
     : allRequests;

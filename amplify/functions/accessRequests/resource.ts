@@ -101,3 +101,14 @@ export const getCloudTrailLogsFunction = defineFunction({
   timeoutSeconds: 30,
   resourceGroupName: "data",
 });
+
+// Consumes the AccessRequestTable DynamoDB stream and republishes status
+// transitions through AppSync. Lives in the data stack because it needs both
+// the stream ARN (AccessRequestWorkflow) and the GraphQL endpoint (data):
+// from here both dependencies point data → AccessRequestWorkflow, no cycle.
+export const publishRequestStatusChangeFunction = defineFunction({
+  name: "publishRequestStatusChange",
+  entry: "./publishRequestStatusChangeHandler.ts",
+  timeoutSeconds: 30,
+  resourceGroupName: "data",
+});

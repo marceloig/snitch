@@ -26,11 +26,15 @@ nav_order: 1
 
 The page lists every access request from every user, newest first, with its status, requester, account, permission set, duration, and timestamps. Admins can filter and search to find any request.
 
+The table keeps itself current: a new request, an approval decision, a session that expires on its own, and a revocation all appear within about a second, without reloading the page. A **Refresh** button is still there for a manual reload.
+
 ---
 
 ## Revoke Active Sessions
 
 An admin can select any **active** request and end it before its scheduled expiry — useful when access is no longer needed or a session looks suspicious. Revoking immediately removes the permission set from the user's account, and the admin can record an optional reason, which appears in a **Revoke reason** column for the audit record. The request's status changes to *Revoked*.
+
+Revocation is not instantaneous behind the scenes — Snitch signals the workflow, which then removes the permission set. The row shows *Revoked* right away and settles onto the stored record once the removal completes, so there is no need to refresh and check.
 
 ---
 
