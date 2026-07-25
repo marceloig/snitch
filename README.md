@@ -44,7 +44,7 @@ When building policies, admins can browse live data from the connected AWS organ
 
 ### 7. Notifications
 
-Snitch can announce the access-request lifecycle over **Slack** and **Amazon SNS**, with per-channel toggles in Settings. Notifications fire when access is **requested**, when a session **finishes** (expires or is revoked), and when a request **needs approval**. Slack approval messages are interactive (Approve/Reject buttons); the SNS approval email links back to the in-app Approve Requests page so approvals stay fully authorized. See [docs/pages/notifications.md](docs/pages/notifications.md).
+Snitch can announce the access-request lifecycle over **Slack** and **Amazon SNS**, with per-channel toggles in Settings. Notifications fire when access is **requested**, when a session **finishes** (expires or is revoked), and when a request **needs approval**. Slack approval messages are interactive (Approve/Reject buttons); the SNS approval email links back to the in-app Approve Requests page so approvals stay fully authorized. See [docs/pages/settings.md](docs/pages/settings.md#notifications).
 
 ---
 
