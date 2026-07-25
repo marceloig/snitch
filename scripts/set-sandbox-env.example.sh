@@ -11,11 +11,12 @@
 # The SAML metadata URL is now a plain env var (IDC_SAML_METADATA_URL) set here — it
 # is no longer read from AWS Secrets Manager.
 #
-# In an Amplify Hosting build, COGNITO_DOMAIN_PREFIX and APP_CALLBACK_URL are optional:
-# they auto-derive from the reserved AWS_APP_ID / AWS_BRANCH build vars. A local sandbox
-# has neither, so COGNITO_DOMAIN_PREFIX is required here (without it the Cognito login
-# domain — and thus the OAuth callback — has no value); APP_CALLBACK_URL defaults to the
-# local Vite dev server.
+# COGNITO_DOMAIN_PREFIX and APP_CALLBACK_URL are both optional. In an Amplify Hosting build
+# they auto-derive from the reserved AWS_APP_ID / AWS_BRANCH build vars; in a local sandbox
+# COGNITO_DOMAIN_PREFIX auto-derives as "snitch-sandbox-<account-id>" from CDK_DEFAULT_ACCOUNT
+# (globally unique + stable, so it never collides or replaces the Cognito domain on redeploy).
+# Set COGNITO_DOMAIN_PREFIX explicitly only to pick a custom domain or run >1 sandbox in the
+# same account. APP_CALLBACK_URL defaults to the local Vite dev server.
 #
 # Usage:
 #   1. Edit the values below to match your AWS environment.
@@ -27,10 +28,6 @@
 # Sourcing (not executing) is required — a subshell's exports would not persist.
 
 # --- Required: edit these for your environment -------------------------------
-
-# Globally-unique prefix for the Cognito managed-login domain
-# (becomes "<prefix>.auth.<region>.amazoncognito.com").
-export COGNITO_DOMAIN_PREFIX="${COGNITO_DOMAIN_PREFIX:-snitch-auth}"
 
 # IAM Identity Center identity store id (format: d-xxxxxxxxxx).
 # Find it: AWS Console → IAM Identity Center → Settings, or
@@ -57,6 +54,12 @@ export AUDITOR_GROUP_ID="${AUDITOR_GROUP_ID:-e428d498-f0c1-70a7-7071-b6daba334db
 
 # --- Optional: has a sensible default ----------------------------------------
 
+# Globally-unique prefix for the Cognito managed-login domain
+# (becomes "<prefix>.auth.<region>.amazoncognito.com"). Leave unset to auto-derive
+# "snitch-sandbox-<account-id>" from CDK_DEFAULT_ACCOUNT at synth. Set it to run more than
+# one sandbox in the same AWS account, or to choose a custom domain.
+export COGNITO_DOMAIN_PREFIX="${COGNITO_DOMAIN_PREFIX:-}"
+
 # OAuth callback/logout URL registered on the user pool client, and the base URL for
 # the SNS approval link. Defaults to the local Vite dev server. In an Amplify Hosting
 # build it auto-derives as https://<AWS_BRANCH>.<AWS_APP_ID>.amplifyapp.com when unset;
@@ -66,7 +69,8 @@ export APP_CALLBACK_URL="${APP_CALLBACK_URL:-http://localhost:5173}"
 # --- Validation --------------------------------------------------------------
 
 _snitch_missing=()
-[ -z "${COGNITO_DOMAIN_PREFIX}" ] && _snitch_missing+=("COGNITO_DOMAIN_PREFIX")
+# COGNITO_DOMAIN_PREFIX is intentionally optional (unset = auto-derived from CDK_DEFAULT_ACCOUNT
+# as "snitch-sandbox-<account-id>" at synth), so it is not validated here.
 [ -z "${IDC_IDENTITY_STORE_ID}" ] && _snitch_missing+=("IDC_IDENTITY_STORE_ID")
 [ -z "${IDC_SAML_METADATA_URL}" ] && _snitch_missing+=("IDC_SAML_METADATA_URL")
 # AUDITOR_GROUP_ID is intentionally optional (empty = no Auditors), so it is not validated here.
@@ -96,7 +100,7 @@ if [[ "${IDC_SAML_METADATA_URL}" == *REPLACE_ME* ]]; then
 fi
 
 echo "Snitch sandbox env vars set:"
-echo "  COGNITO_DOMAIN_PREFIX = ${COGNITO_DOMAIN_PREFIX}"
+echo "  COGNITO_DOMAIN_PREFIX = ${COGNITO_DOMAIN_PREFIX:-(unset — auto-derived as snitch-sandbox-<account-id>)}"
 echo "  IDC_IDENTITY_STORE_ID = ${IDC_IDENTITY_STORE_ID}"
 echo "  IDC_SAML_METADATA_URL = ${IDC_SAML_METADATA_URL}"
 echo "  ADMIN_GROUP_ID        = ${ADMIN_GROUP_ID}"
