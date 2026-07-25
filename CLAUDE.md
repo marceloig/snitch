@@ -299,7 +299,7 @@ permit (
 | `NOTIFICATIONS_TOPIC_ARN` | Notification publishers (`requestAccessHandler`, `removePermissionSetHandler`, `storeApprovalTokenHandler`); also read-only on `getSettingsHandler` to surface the ARN |
 | `APP_CALLBACK_URL` | `storeApprovalTokenHandler` — builds the SNS approval email's link to the Approve Requests page |
 
-`COGNITO_DOMAIN_PREFIX` and `APP_CALLBACK_URL` are optional synth-time values resolved in `amplify/synthEnv.ts`: in an Amplify Hosting build they auto-derive from the reserved `AWS_APP_ID`/`AWS_BRANCH` vars (`snitch-<branch>-<app-id>` and `https://<branch>.<app-id>.amplifyapp.com`); a local sandbox has no app id, so `COGNITO_DOMAIN_PREFIX` is required there and `APP_CALLBACK_URL` defaults to `http://localhost:5173`.
+`COGNITO_DOMAIN_PREFIX` and `APP_CALLBACK_URL` are optional synth-time values resolved in `amplify/synthEnv.ts`: in an Amplify Hosting build they auto-derive from the reserved `AWS_APP_ID`/`AWS_BRANCH` vars (`snitch-<branch>-<app-id>` and `https://<branch>.<app-id>.amplifyapp.com`); a local sandbox has no app id, so `COGNITO_DOMAIN_PREFIX` auto-derives as `snitch-sandbox-<account-id>` from `CDK_DEFAULT_ACCOUNT` (the CDK-populated account id — globally unique and stable, the sandbox analog of the app-id derivation) and `APP_CALLBACK_URL` defaults to `http://localhost:5173`. Set `COGNITO_DOMAIN_PREFIX` explicitly only to choose a custom domain or run more than one sandbox in the same AWS account.
 
 ### IAM Permissions
 

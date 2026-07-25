@@ -54,8 +54,13 @@ export function sanitizeDomainPrefix(raw: string): string {
  *   1. explicit COGNITO_DOMAIN_PREFIX (operator always wins)
  *   2. snitch-<branch>-<app-id> (sanitized) — stable per Amplify app+branch, so redeploys
  *      never replace CfnUserPoolDomain; app-id is globally unique so the prefix is too
- *   3. throw — outside Amplify Hosting there is no AWS_APP_ID to derive from, so the operator
- *      must set COGNITO_DOMAIN_PREFIX (the sandbox script provides "snitch-auth" by default)
+ *   3. snitch-sandbox-<account-id> (sanitized) — the sandbox analog of #2. A local sandbox has
+ *      no AWS_APP_ID, but the CDK toolkit populates CDK_DEFAULT_ACCOUNT from the deploy
+ *      credentials at synth. Account ids are globally unique across all AWS accounts, so the
+ *      derived prefix can never collide with another account's, and it is stable across
+ *      redeploys so CfnUserPoolDomain is never replaced. This makes COGNITO_DOMAIN_PREFIX
+ *      optional for a sandbox (set it explicitly only to run >1 sandbox in the same account).
+ *   4. throw — no app-id and no account id to derive from, so the operator must set the var
  *
  * @example resolveCognitoDomainPrefix(process.env) // "snitch-main-d1mt6ip3ppwmko"
  */
@@ -66,9 +71,12 @@ export function resolveCognitoDomainPrefix(env: SynthEnv): string {
   const branch = env.AWS_BRANCH?.trim();
   if (appId && branch) return sanitizeDomainPrefix(`snitch-${branch}-${appId}`);
   if (appId) return sanitizeDomainPrefix(`snitch-${appId}`);
+  const account = env.CDK_DEFAULT_ACCOUNT?.trim();
+  if (account) return sanitizeDomainPrefix(`snitch-sandbox-${account}`);
   throw new Error(
-    "COGNITO_DOMAIN_PREFIX is required outside Amplify Hosting (no AWS_APP_ID to derive a " +
-      "stable Cognito domain prefix). Set it (e.g. via scripts/set-sandbox-env.sh) before deploying."
+    "COGNITO_DOMAIN_PREFIX is required: no AWS_APP_ID (Amplify Hosting) or CDK_DEFAULT_ACCOUNT " +
+      "(sandbox) was available to derive a stable Cognito domain prefix. Set it explicitly " +
+      "(e.g. via scripts/set-sandbox-env.sh) before deploying."
   );
 }
 

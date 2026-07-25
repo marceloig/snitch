@@ -73,7 +73,7 @@ The variables a sandbox needs:
 | `IDC_IDENTITY_STORE_ID` | Yes | Identity Store ID (`d-xxxxxxxxxxxx`) |
 | `ADMIN_GROUP_ID` | Yes | Immutable IDC **GroupId** whose members receive the `Admins` claim |
 | `AUDITOR_GROUP_ID` | No | IDC GroupId whose members receive the read-only `Auditors` claim; unset ⇒ no auditors |
-| `COGNITO_DOMAIN_PREFIX` | Yes (sandbox) | A globally unique Cognito domain prefix (e.g., `snitch-auth`). Required locally because there is no Amplify app id to derive one from. |
+| `COGNITO_DOMAIN_PREFIX` | No | A globally unique Cognito domain prefix (e.g., `snitch-auth`). Unset ⇒ auto-derived as `snitch-sandbox-<account-id>` from `CDK_DEFAULT_ACCOUNT`. Set it to choose a custom domain or run more than one sandbox in the same account. |
 | `APP_CALLBACK_URL` | No | Defaults to `http://localhost:5173` for a sandbox |
 
 {: .note }
@@ -151,7 +151,7 @@ npm run sandbox
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Synthesis fails with `Environment variable ... is required for synth-time Cognito config.` | A required variable is unset | Set `IDC_SAML_METADATA_URL`, `IDC_IDENTITY_STORE_ID`, `ADMIN_GROUP_ID`, and `COGNITO_DOMAIN_PREFIX` before deploying |
+| Synthesis fails with `Environment variable ... is required for synth-time Cognito config.` | A required variable is unset | Set `IDC_SAML_METADATA_URL`, `IDC_IDENTITY_STORE_ID`, and `ADMIN_GROUP_ID` before deploying (`COGNITO_DOMAIN_PREFIX` auto-derives from `CDK_DEFAULT_ACCOUNT` in a sandbox) |
 | SAML login fails with `Audience URI mismatch` | Placeholder audience still set | Update the IDC audience to `urn:amazon:cognito:sp:<USER_POOL_ID>` |
 | Login fails with `User not assigned` | IDC user/group not assigned to the application | Assign the user or their group to the IDC SAML application |
 | Admin pages show **Access denied** for an admin | `ADMIN_GROUP_ID` doesn't match the user's IDC GroupId, or the user hasn't re-authenticated | Verify the GroupId, then sign out and back in |

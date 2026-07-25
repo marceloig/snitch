@@ -36,7 +36,29 @@ describe("resolveCognitoDomainPrefix", () => {
     expect(resolveCognitoDomainPrefix({ AWS_APP_ID: APP_ID })).toBe(`snitch-${APP_ID}`);
   });
 
-  it("throws when there is no explicit value and no AWS_APP_ID (sandbox without the var)", () => {
+  it("derives snitch-sandbox-<account> from CDK_DEFAULT_ACCOUNT in a sandbox (no app-id)", () => {
+    expect(resolveCognitoDomainPrefix({ CDK_DEFAULT_ACCOUNT: "123456789012" })).toBe(
+      "snitch-sandbox-123456789012"
+    );
+  });
+
+  it("prefers the app-id derivation over the sandbox account fallback", () => {
+    expect(
+      resolveCognitoDomainPrefix({ AWS_APP_ID: APP_ID, CDK_DEFAULT_ACCOUNT: "123456789012" })
+    ).toBe(`snitch-${APP_ID}`);
+  });
+
+  it("prefers an explicit prefix over the sandbox account fallback", () => {
+    expect(
+      resolveCognitoDomainPrefix({ COGNITO_DOMAIN_PREFIX: "chosen", CDK_DEFAULT_ACCOUNT: "123456789012" })
+    ).toBe("chosen");
+  });
+
+  it("produces a valid Cognito prefix from the sandbox account id", () => {
+    expect(resolveCognitoDomainPrefix({ CDK_DEFAULT_ACCOUNT: "123456789012" })).toMatch(VALID_PREFIX);
+  });
+
+  it("throws only when there is no explicit value, no AWS_APP_ID, and no account id", () => {
     expect(() => resolveCognitoDomainPrefix({})).toThrow(/COGNITO_DOMAIN_PREFIX is required/);
   });
 
