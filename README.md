@@ -36,7 +36,7 @@ Admins configure which users or groups can approve requests for each AWS account
 
 Admins can view all active and historical requests across every user, revoke live access early with an optional comment, and inspect the full CloudTrail audit trail for each access window.
 
-Request tables update themselves in near real time — including status changes written by the workflow rather than by a user, such as a session expiring on its own or the 24-hour approval timeout. A DynamoDB stream on the request table republishes every status transition over an AppSync subscription, so the admin and auditor pages never need polling. See [docs/pages/architecture.md](docs/pages/architecture.md#live-status-updates).
+Request tables update themselves in near real time — including status changes written by the workflow rather than by a user, such as a session expiring on its own or the 24-hour approval timeout. A DynamoDB stream on the request table republishes every status transition over an AppSync subscription, so the admin and auditor pages never need polling. See [docs/pages/architecture-api.md](docs/pages/architecture-api.md#live-status-updates).
 
 ### 6. AWS Resource Discovery
 
@@ -71,7 +71,7 @@ src/              # Frontend (React)
 
 ## Getting Started
 
-This is a condensed overview. For the full step-by-step walkthrough, see [docs/pages/getting-started.md](docs/pages/getting-started.md) (production) and [docs/pages/idc-saml-setup.md](docs/pages/idc-saml-setup.md) (local sandbox).
+This is a condensed overview. For the full step-by-step walkthrough, see [docs/pages/getting-started.md](docs/pages/getting-started.md) (production) and [docs/pages/sandbox-deployment.md](docs/pages/sandbox-deployment.md) (local sandbox).
 
 ### Prerequisites
 
@@ -138,7 +138,7 @@ npx ampx sandbox
 
 `npx ampx sandbox` deploys all backend infrastructure and writes `amplify_outputs.json` with the resource endpoints.
 
-After the first deploy, update the **Application SAML audience** in the IDC console to match the newly created User Pool ID. See [Update the SAML Audience URI](docs/pages/idc-saml-setup.md#update-the-saml-audience-uri) for details.
+After the first deploy, update the **Application SAML audience** in the IDC console to match the newly created User Pool ID. See [Getting Started, Step 3a](docs/pages/getting-started.md#3a-finalize-the-acs-url-and-saml-audience-uri) for details.
 
 ### Run frontend
 

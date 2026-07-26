@@ -59,14 +59,17 @@ function SlackHelpPanel() {
           <code>chat:write</code> — post messages to channels
         </li>
         <li>
-          <code>users:read.email</code> — look up a Slack user&apos;s email to match against
+          <code>users:read</code> — look up the Slack user who tapped a button
+        </li>
+        <li>
+          <code>users:read.email</code> — read that user&apos;s email to match against
           configured approvers
         </li>
       </ul>
       <h3>Setup steps</h3>
       <ol>
         <li>Create a Slack app at <strong>api.slack.com/apps</strong>.</li>
-        <li>Add the required bot scopes under <strong>OAuth &amp; Permissions</strong>.</li>
+        <li>Add all three bot scopes under <strong>OAuth &amp; Permissions</strong>.</li>
         <li>Install the app to your workspace and copy the <strong>Bot Token</strong>.</li>
         <li>
           Copy the <strong>Signing Secret</strong> from the app&apos;s{" "}
@@ -74,9 +77,15 @@ function SlackHelpPanel() {
         </li>
         <li>Invite the bot to the target channel and copy the <strong>Channel ID</strong>.</li>
         <li>
-          After deploying the sandbox, find the <strong>Lambda Function URL</strong> in the CDK
-          stack outputs and paste it into the Slack app&apos;s{" "}
-          <strong>Interactivity &amp; Shortcuts → Request URL</strong>.
+          Find the Slack endpoint URL in the AWS console under <strong>Lambda → Functions</strong>:
+          filter for <code>slackInteractive</code>, then open{" "}
+          <strong>Configuration → Function URL</strong>. It is not published as a deployment
+          output.
+        </li>
+        <li>
+          Paste that URL into the Slack app&apos;s{" "}
+          <strong>Interactivity &amp; Shortcuts → Request URL</strong>. Without this step the
+          Approve / Reject buttons do nothing.
         </li>
       </ol>
       <h3>How approval works</h3>

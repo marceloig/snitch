@@ -28,16 +28,13 @@ The **Settings** page (admin-only) is where administrators configure application
 
 ## CloudTrail Audit Logs
 
-To enable the audit trail on the [Elevated Access]({% link pages/elevated-access.md %}) and [Session Activity]({% link pages/session-activity.md %}) pages:
+To turn on the audit trail for the [Elevated Access]({% link pages/elevated-access.md %}) and [Session Activity]({% link pages/session-activity.md %}) pages:
 
-1. Make sure CloudTrail is delivering events to a CloudWatch Logs log group **in the same AWS account and Region as Snitch** — follow [CloudTrail Setup]({% link pages/cloudtrail-setup.md %}), which covers the delegated-administrator registration and the AWS CLI commands this requires.
+1. Set up the log group first — follow [CloudTrail Setup]({% link pages/cloudtrail-setup.md %}).
 2. Open **Settings** in Snitch.
-3. Enter the log group name (e.g., `CloudTrail/snitch-audit`) and save.
+3. Enter the log group name in **CloudWatch Log Group** (for example `CloudTrail/snitch-audit`) and save.
 
-Once configured, Snitch queries that log group for each session's activity. If it's left blank, the audit trail is simply empty.
-
-{: .note }
-Snitch reads the log group from its own account and Region. A log group in the Organizations management account, or in another Region, is unreachable and the audit trail stays empty.
+Enter the log group's **name**, not its ARN. Once it's set, Snitch queries that log group for each session's activity. Leave it blank and the audit trail is simply empty — nothing else breaks.
 
 ---
 
@@ -57,10 +54,10 @@ Each channel is controlled by its own toggle, so you can, for example, send appr
 
 ### Slack
 
-To use Slack notifications, enter the Slack app credentials (bot token, channel, and signing secret) in the **Slack Integration** card, then enable the Slack notifications toggle.
+Fill in **Bot Token**, **Channel ID**, and **Signing Secret** in the **Slack Integration** card, then turn on the Slack toggle. Creating the Slack app and finding those three values is covered step by step in [Slack Setup]({% link pages/slack-setup.md %}).
 
 - **Requested / finished** messages are informational.
-- **Approval required** messages include **Approve** / **Reject** buttons so approvers can act directly from Slack. The clicker's identity is verified and authorized before anything happens, so only real approvers can act.
+- **Approval required** messages carry **Approve** and **Reject** buttons, so approvers can decide without leaving Slack. Snitch verifies who tapped the button and checks their authorization before acting, so only real approvers can move a request.
 
 ### Email (Amazon SNS)
 
@@ -74,4 +71,4 @@ Email notifications are delivered through an app-managed Amazon SNS topic. To re
 Email subject lines include the account label, for example `AWS access approval required - Production (111111111111)`.
 
 {: .note }
-Approval **emails** deliberately don't carry one-click approve/reject buttons: an email recipient can't be securely identified, so the message instead links to the in-app Approve Requests page, where the approver signs in and acts with full authorization. Slack approvals stay interactive because the Slack click is verified and authorized.
+Approval **emails** deliberately carry no one-click buttons. There's no way to tell who actually clicked a link in an email, so the message links to the in-app Approve Requests page instead, where the approver signs in first. Slack messages can stay interactive because Slack signs every button tap, which lets Snitch confirm who sent it.

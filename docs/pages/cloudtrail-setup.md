@@ -1,13 +1,16 @@
 ---
 title: CloudTrail Setup
 layout: default
-nav_order: 4
+parent: Setup
+nav_order: 3
 ---
 
 # CloudTrail Setup
 {: .no_toc }
 
-Snitch's audit trails — [Elevated Access]({% link pages/elevated-access.md %}) for admins and [Session Activity]({% link pages/session-activity.md %}) for auditors — read CloudTrail events from a **CloudWatch Logs log group**. This page walks through configuring that log group with the AWS CLI so Snitch can actually read it.
+Snitch's audit trails — [Elevated Access]({% link pages/elevated-access.md %}) for admins and [Session Activity]({% link pages/session-activity.md %}) for auditors — read AWS activity records from a **CloudWatch log group**. This page sets that log group up.
+
+It's about six AWS CLI commands and a few minutes of waiting. Snitch works fine without it; you just won't see what people did during their sessions.
 
 ## Table of Contents
 {: .no_toc .text-delta }
@@ -19,9 +22,11 @@ Snitch's audit trails — [Elevated Access]({% link pages/elevated-access.md %})
 
 ## Why This Is Required
 
-Snitch queries CloudWatch Logs from inside its own AWS account and Region. There is no cross-account or cross-Region access anywhere in the audit path, which means the **log group must exist in the same AWS account and Region where Snitch is deployed** — the IAM Identity Center delegated administrator account (see [Getting Started → Prerequisites]({% link pages/getting-started.md %}#prerequisites)).
+Snitch queries CloudWatch Logs from inside its own AWS account and Region. Nothing in the audit path crosses an account or Region boundary, so the **log group must live in the same account and Region as Snitch** — the Identity Center delegated administrator account (see [Getting Started → Prerequisites]({% link pages/getting-started.md %}#prerequisites)).
 
-In an AWS Organization the trail you want to read is normally an **organization trail**, and that trail is owned by the management account. AWS constrains how its CloudWatch Logs destination can be set:
+That's the whole constraint, and it's the one thing people get wrong. Everything below exists to satisfy it.
+
+In an organization the trail you want is normally an **organization trail**, owned by the management account. AWS limits how its CloudWatch Logs destination can be set:
 
 - Only the **management account** can attach a CloudWatch Logs log group to an organization trail **using the console** — and doing so creates the log group in the management account, where Snitch cannot reach it.
 - A **CloudTrail delegated administrator** can attach a log group too, but **only through the AWS CLI or the `CreateTrail` / `UpdateTrail` API operations**. In that case "both the CloudWatch Logs log group and log role must exist in the calling account."

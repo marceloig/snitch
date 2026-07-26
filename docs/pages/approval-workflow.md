@@ -1,7 +1,7 @@
 ---
 title: Approval Workflow
 layout: default
-nav_order: 7
+nav_order: 6
 ---
 
 # Approval Workflow
@@ -25,9 +25,9 @@ This adds a human checkpoint without slowing down the rest of the flow: unapprov
 
 ## Configuring Who Can Approve
 
-*Whether* approval is needed lives on the Privileged Policy. *Who* may approve is configured separately by an admin on the **Approval Policy** page.
+*Whether* approval is needed lives on the privileged policy. *Who* may approve is set separately by an admin on the **Approval Policies** page.
 
-Each approval policy grants one approver — an individual user or a group — the ability to approve requests for a specific **AWS account**, limited to one or more chosen **permission sets**. An admin can add as many approvers per account as needed. Approval policies are created and removed on the Approval Policy page (to change one, delete it and create a new one).
+Each approval policy names one approver — a person or a group — and gives them the ability to sign off on requests for one **AWS account**, limited to the **permission sets** you choose. Add as many approvers per account as you need. There's no edit: to change an approval policy, delete it and create a new one.
 
 ---
 

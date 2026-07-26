@@ -1,7 +1,7 @@
 ---
 title: Privileged Policies
 layout: default
-nav_order: 5
+nav_order: 4
 ---
 
 # Privileged Policies
@@ -19,7 +19,7 @@ nav_order: 5
 
 A **Privileged Policy** is the rule that says *who* may request *what* access. Each policy grants an IAM Identity Center (IDC) user or group the ability to request temporary access to one or more AWS accounts and/or Organizational Units (OUs) using a specific **Permission Set**.
 
-Privileged Policies never grant standing access on their own — they define the boundaries of what a person is *allowed to request*. Actual access is always time-boxed and granted through an [Access Request]({% link pages/access-requests.md %}).
+A privileged policy never grants access on its own — it sets the boundaries of what someone is *allowed to request*. Actual access is always time-limited and comes through an [Access Request]({% link pages/access-requests.md %}).
 
 Managing Privileged Policies is an **admin-only** capability.
 

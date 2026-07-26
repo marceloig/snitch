@@ -1,7 +1,7 @@
 ---
 title: Access Requests
 layout: default
-nav_order: 6
+nav_order: 5
 ---
 
 # Access Requests
@@ -17,21 +17,21 @@ nav_order: 6
 
 ## What It Does
 
-Any authenticated user can request **temporary, time-boxed access** to an AWS account through the self-service **Request Access** page. Snitch grants the permission set automatically, keeps it active for the requested duration, then revokes it — no manual clean-up, no standing access.
+Any signed-in user can request **temporary, time-limited access** to an AWS account from the self-service **Request Access** page. Snitch grants the permission set automatically, holds it open for the requested period, then takes it away — no manual cleanup, no leftover access.
 
 ---
 
 ## Requesting Access
 
-The Request Access form only offers what the user is actually allowed to request. Based on their [Privileged Policies]({% link pages/privileged-policies.md %}), Snitch shows:
+The form offers only what you're allowed to ask for. Based on your [Privileged Policies]({% link pages/privileged-policies.md %}), Snitch shows:
 
-- The **accounts** they may access.
-- The **permission sets** available on each account.
-- The **maximum duration** they may request.
+- The **accounts** you can reach.
+- The **permission sets** available on each one.
+- The **longest duration** you can request.
 
-The user picks an account, a permission set, and how long they need access (by choosing when it should end), optionally adds a justification, and submits.
+Pick an account, a permission set, and when the access should end. Add a justification if you like, and submit.
 
-If the matching policy requires approval, the form warns the user up front, and the request waits for an approver before any access is granted.
+If the matching policy requires approval, the form says so before you submit, and the request waits for an approver before anything is granted.
 
 ---
 
