@@ -29,7 +29,7 @@ Snitch is a fullstack application for managing privileged access to AWS accounts
 | **Elevated Access** | Admins view all active requests, revoke access early, and inspect the CloudTrail audit trail |
 | **Notifications** | Slack and Amazon SNS alerts for access requested, finished, and approval-required events, each toggled in Settings |
 | **AVP Authorization** | All access decisions are evaluated by AWS Verified Permissions (Cedar), not application logic |
-| **CloudTrail Audit** | Every activated session is queryable through CloudWatch Logs via a configurable log group |
+| **CloudTrail Audit** | Every activated session is queryable through CloudWatch Logs via a configurable log group ([setup]({% link pages/cloudtrail-setup.md %})) |
 | **Live Status Updates** | A DynamoDB stream republishes every request status transition over an AppSync subscription, so admin and auditor tables update without polling |
 
 ## Technology Stack

@@ -36,8 +36,11 @@ As a best practice, delegate IDC administration to a dedicated member account ra
 {: .note }
 Snitch authenticates every user through IAM Identity Center via SAML 2.0. Amazon Cognito sits behind IDC and issues the tokens the app uses — you never manage passwords in Snitch.
 
+{: .important }
+The **Session Activity** and **Elevated Access** CloudTrail audit trails read session events from CloudWatch Logs, so CloudTrail must **deliver its logs to a CloudWatch Logs log group** — an S3-only trail is not enough. Snitch reads that log group from **its own account and Region**, which means the log group must live in the account you deploy Snitch into. For an organization trail that requires two things: the Snitch account must be registered as a **CloudTrail delegated administrator**, and the trail's CloudWatch Logs destination must be configured **from that account with the AWS CLI**. See [CloudTrail Setup]({% link pages/cloudtrail-setup.md %}) for the full walkthrough.
+
 {: .note }
-The **Session Activity** and **Elevated Access** CloudTrail audit trails read session events from CloudWatch Logs. For those pages to show any events, CloudTrail must be configured to **deliver its logs to a CloudWatch Logs log group** — an S3-only trail is not enough. You supply that log group name later on the **Settings** page (see Step 3d).
+The console path does not work here: only the management account can attach a log group to an organization trail from the console, and that creates the log group in the management account, where Snitch cannot read it. This is an AWS constraint — see [Sending CloudTrail events to CloudWatch Logs](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/send-cloudtrail-events-to-cloudwatch-logs.html). You supply the log group name on the **Settings** page once it exists (see Step 3d).
 
 ---
 
@@ -167,7 +170,7 @@ The read-only auditor pages (**Approval History** and **Session Activity**) are 
 
 ### 3d. Configure the CloudTrail log group (optional)
 
-To enable the CloudTrail audit trail, an admin opens **Settings** and enters the CloudWatch log group where CloudTrail delivers events. Everything else — IDC users, groups, accounts, OUs, and permission sets — is discovered live from AWS, with no manual configuration.
+To enable the CloudTrail audit trail, an admin opens **Settings** and enters the CloudWatch log group where CloudTrail delivers events. Creating that log group and pointing the trail at it is a one-time AWS-side setup — follow [CloudTrail Setup]({% link pages/cloudtrail-setup.md %}) first. Everything else — IDC users, groups, accounts, OUs, and permission sets — is discovered live from AWS, with no manual configuration.
 
 ---
 

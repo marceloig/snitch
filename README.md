@@ -84,7 +84,7 @@ This is a condensed overview. For the full step-by-step walkthrough, see [docs/p
 
 > **Deploy in the same account and Region as IDC.** Snitch calls the IDC Identity Store and SSO APIs directly, so it must run in the same AWS account and Region that hosts your IAM Identity Center instance. If IDC administration has been **delegated to a member account**, deploy Snitch into that delegated administrator account — not the Organizations management account. Delegating IDC to a dedicated account (rather than running it in the management account) is the recommended practice.
 
-> **CloudTrail → CloudWatch for session audit.** The Session Activity and Elevated Access audit trails read events from CloudWatch Logs. For those pages to show anything, CloudTrail must be configured to deliver its logs to a CloudWatch Logs log group (an S3-only trail is not enough). You supply that log group name later on the in-app **Settings** page.
+> **CloudTrail → CloudWatch for session audit.** The Session Activity and Elevated Access audit trails read events from CloudWatch Logs, so CloudTrail must deliver its logs to a CloudWatch Logs log group (an S3-only trail is not enough). Snitch reads that log group from **its own account and Region**, so for an organization trail the Snitch account must be registered as a **CloudTrail delegated administrator** and the trail's CloudWatch Logs destination must be configured **from that account with the AWS CLI** — the console path only works from the management account and creates the log group there, out of Snitch's reach. See [docs/pages/cloudtrail-setup.md](docs/pages/cloudtrail-setup.md) for the CLI walkthrough. You supply the log group name on the in-app **Settings** page once it exists.
 
 ### Install
 

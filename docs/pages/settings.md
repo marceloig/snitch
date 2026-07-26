@@ -30,11 +30,14 @@ The **Settings** page (admin-only) is where administrators configure application
 
 To enable the audit trail on the [Elevated Access]({% link pages/elevated-access.md %}) and [Session Activity]({% link pages/session-activity.md %}) pages:
 
-1. Make sure CloudTrail is enabled in your AWS account and delivering events to a CloudWatch Logs log group.
+1. Make sure CloudTrail is delivering events to a CloudWatch Logs log group **in the same AWS account and Region as Snitch** — follow [CloudTrail Setup]({% link pages/cloudtrail-setup.md %}), which covers the delegated-administrator registration and the AWS CLI commands this requires.
 2. Open **Settings** in Snitch.
-3. Enter the log group name (e.g., `/aws/cloudtrail/my-trail`) and save.
+3. Enter the log group name (e.g., `CloudTrail/snitch-audit`) and save.
 
 Once configured, Snitch queries that log group for each session's activity. If it's left blank, the audit trail is simply empty.
+
+{: .note }
+Snitch reads the log group from its own account and Region. A log group in the Organizations management account, or in another Region, is unreachable and the audit trail stays empty.
 
 ---
 

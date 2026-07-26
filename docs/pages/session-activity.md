@@ -16,7 +16,7 @@ nav_order: 2
 
 For each session, the page shows the requester, account, permission set, and the actual start and end times of the granted access. Selecting a session opens its details and the **CloudTrail event log** for that access window: the AWS API activity the user performed while their elevated access was active.
 
-The audit trail relies on a CloudTrail log group being configured on the [Settings]({% link pages/settings.md %}#cloudtrail-audit-logs) page. Without it, session records still appear but their CloudTrail log is empty.
+The audit trail relies on a CloudTrail log group being configured on the [Settings]({% link pages/settings.md %}#cloudtrail-audit-logs) page. Without it, session records still appear but their CloudTrail log is empty. See [CloudTrail Setup]({% link pages/cloudtrail-setup.md %}) for how that log group is created.
 
 The list updates on its own: a session appears as soon as access is actually granted and is marked as ended when it expires or is revoked, with no reload needed. **Refresh** is available for a manual reload.
 
